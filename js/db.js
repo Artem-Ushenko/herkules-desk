@@ -24,7 +24,9 @@ function migrate(db, oldVersion) {
       const visits = db.createObjectStore(STORES.visits, { keyPath: 'id' });
       visits.createIndex('clientId', 'clientId');
       visits.createIndex('checkIn', 'checkIn');
-      visits.createIndex('checkOut', 'checkOut');
+      // Відкриті візити позначаються полем open=1; при виході поле видаляється,
+      // і запис зникає з індексу — «хто в залі» читається одним запитом
+      visits.createIndex('open', 'open');
 
       const payments = db.createObjectStore(STORES.payments, { keyPath: 'id' });
       payments.createIndex('clientId', 'clientId');
