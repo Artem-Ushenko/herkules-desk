@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Геркулес — тести</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    .ok { color: #1a7f37; }
+    .fail { color: #cf222e; font-weight: 600; }
+    li { margin: .25rem 0; }
+    #summary { font-size: 1.2rem; font-weight: 700; margin-bottom: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Тести Геркулеса</h1>
+  <div id="summary">Виконується…</div>
+  <ul id="results"></ul>
+  <script type="module">
+    import './access.test.js';
+    import { runAll } from './runner.js';
+
+    const { results, passed, failed } = await runAll();
+    const ul = document.getElementById('results');
+    for (const r of results) {
+      const li = document.createElement('li');
+      li.className = r.ok ? 'ok' : 'fail';
+      li.textContent = (r.ok ? '✓ ' : '✗ ') + r.name + (r.ok ? '' : ' — ' + r.error);
+      ul.appendChild(li);
+    }
+    const s = document.getElementById('summary');
+    s.textContent = failed === 0 ? `Усі ${passed} тестів пройшли ✓` : `Провалено ${failed} з ${passed + failed}`;
+    s.className = failed === 0 ? 'ok' : 'fail';
+    // Для автоматичної перевірки з консолі
+    window.__testReport = { passed, failed };
+  </script>
+</body>
+</html>
