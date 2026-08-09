@@ -5,6 +5,7 @@ import { initClients, onShowClients } from './clients.js';
 import { initSales, onShowSales } from './sales.js';
 import { initJournal, onShowJournal } from './journal.js';
 import { initSettings, onShowSettings } from './settings.js';
+import { initBackup, bindUnloadBackup, onStatusChange, formatStatus } from './backup.js';
 
 const SCREENS = {
   desk: { onShow: () => focusScan() },
@@ -40,3 +41,18 @@ initSales(document.getElementById('screen-sales'));
 initJournal(document.getElementById('screen-journal'));
 initSettings(document.getElementById('screen-settings'));
 route();
+
+// Індикатор бекапу в шапці: проблема має бути видна одразу (розділ 6)
+const backupEl = document.getElementById('backup-status');
+let lastBackupState = null;
+function renderBackupStatus() {
+  if (!lastBackupState) return;
+  const { text, stale } = formatStatus(lastBackupState);
+  backupEl.textContent = text;
+  backupEl.classList.toggle('stale', stale);
+}
+onStatusChange((s) => { lastBackupState = s; renderBackupStatus(); });
+setInterval(renderBackupStatus, 60000); // «3 дні тому» має рости й без нових подій
+
+initBackup();
+bindUnloadBackup();
