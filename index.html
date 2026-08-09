@@ -4,7 +4,29 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Геркулес Клуб</title>
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <header class="topbar">
+    <div class="brand">Геркулес</div>
+    <nav class="tabs" id="nav">
+      <a href="#desk" data-screen="desk" class="active">Стійка</a>
+      <a href="#clients" data-screen="clients">Клієнти</a>
+      <a href="#sales" data-screen="sales">Продажі</a>
+      <a href="#journal" data-screen="journal">Журнал</a>
+      <a href="#settings" data-screen="settings">Налаштування</a>
+    </nav>
+    <div class="backup-status" id="backup-status" title="Стан останнього бекапу">Копія: —</div>
+  </header>
+
+  <main id="screens">
+    <section id="screen-desk" class="screen"></section>
+    <section id="screen-clients" class="screen" hidden><p class="stub">Реєстр клієнтів зʼявиться на етапі M3.</p></section>
+    <section id="screen-sales" class="screen" hidden><p class="stub">Продажі зʼявляться на етапі M3.</p></section>
+    <section id="screen-journal" class="screen" hidden><p class="stub">Журнал зʼявиться на етапі M3.</p></section>
+    <section id="screen-settings" class="screen" hidden><p class="stub">Налаштування зʼявляться на етапі M4.</p></section>
+  </main>
+
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>

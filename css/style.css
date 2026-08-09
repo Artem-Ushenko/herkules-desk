@@ -1,0 +1,152 @@
+:root {
+  --bg: #f4f5f7;
+  --surface: #ffffff;
+  --text: #1a1d21;
+  --muted: #6b7280;
+  --border: #d8dbe0;
+  --accent: #2456d6;
+  --ok: #1a7f37;
+  --ok-bg: #d8f3df;
+  --warn: #9a6700;
+  --warn-bg: #fff3c2;
+  --deny: #cf222e;
+  --deny-bg: #ffe0e3;
+  --radius: 10px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* ── Шапка ── */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0 1rem;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  height: 52px;
+}
+
+.brand { font-weight: 800; font-size: 1.1rem; }
+
+.tabs { display: flex; gap: .25rem; flex: 1; }
+
+.tabs a {
+  padding: .45rem .9rem;
+  border-radius: var(--radius);
+  text-decoration: none;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.tabs a.active { background: var(--accent); color: #fff; }
+.tabs a:hover:not(.active) { background: var(--bg); color: var(--text); }
+
+.backup-status { font-size: .85rem; color: var(--muted); white-space: nowrap; }
+.backup-status.stale { color: var(--deny); font-weight: 700; }
+
+/* ── Екрани ── */
+
+.screen { padding: 1rem; max-width: 1100px; margin: 0 auto; }
+.stub { color: var(--muted); text-align: center; margin-top: 3rem; }
+
+/* ── Стійка: вердикт (читається з двох метрів) ── */
+
+.verdict {
+  border-radius: var(--radius);
+  padding: 1.6rem;
+  min-height: 30vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: background .15s;
+}
+
+.verdict .v-title { font-size: 3rem; font-weight: 800; line-height: 1.1; }
+.verdict .v-sub { font-size: 1.5rem; margin-top: .5rem; }
+.verdict .v-hint { color: var(--muted); font-size: 1.1rem; }
+
+.verdict.ok   { background: var(--ok-bg);   border-color: var(--ok); }
+.verdict.ok .v-title { color: var(--ok); }
+.verdict.warn { background: var(--warn-bg); border-color: var(--warn); }
+.verdict.warn .v-title { color: var(--warn); }
+.verdict.deny { background: var(--deny-bg); border-color: var(--deny); }
+.verdict.deny .v-title { color: var(--deny); }
+
+.verdict .v-actions { margin-top: 1rem; display: flex; gap: .75rem; flex-wrap: wrap; justify-content: center; }
+
+/* ── Поле сканування ── */
+
+.scan-row { display: flex; gap: .75rem; margin: 1rem 0; }
+
+#scan-input {
+  flex: 1;
+  font-size: 1.4rem;
+  padding: .6rem 1rem;
+  border: 2px solid var(--border);
+  border-radius: var(--radius);
+  text-transform: uppercase;
+}
+
+#scan-input:focus { outline: none; border-color: var(--accent); }
+
+/* ── У залі зараз ── */
+
+.in-gym h2 { margin: 1.25rem 0 .5rem; font-size: 1.05rem; color: var(--muted); }
+
+.in-gym-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: .75rem;
+}
+
+.person-tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: .75rem 1rem;
+}
+
+.person-tile .p-name { font-weight: 700; font-size: 1.05rem; }
+.person-tile .p-meta { color: var(--muted); font-size: .85rem; margin-top: .25rem; }
+.person-tile .p-type { display: inline-block; font-size: .75rem; padding: .1rem .5rem; border-radius: 99px; background: var(--bg); margin-top: .4rem; }
+.person-tile .p-type.guest { background: var(--warn-bg); color: var(--warn); }
+.person-tile .p-type.trainer { background: #e0e7ff; color: #3730a3; }
+
+/* ── Кнопки та форми ── */
+
+button, .btn {
+  font: inherit;
+  font-weight: 600;
+  padding: .55rem 1.1rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--text);
+}
+
+button:hover, .btn:hover { border-color: var(--accent); }
+
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-danger { background: var(--deny); border-color: var(--deny); color: #fff; }
+
+.mini-form { display: flex; flex-direction: column; gap: .6rem; margin-top: 1rem; text-align: left; max-width: 420px; }
+.mini-form input[type="text"], .mini-form input[type="tel"] {
+  font: inherit; padding: .5rem .75rem; border: 1px solid var(--border); border-radius: var(--radius); width: 100%;
+}
+.mini-form label { font-size: .9rem; }
+.mini-form .consent { display: flex; gap: .5rem; align-items: flex-start; font-size: .85rem; }
