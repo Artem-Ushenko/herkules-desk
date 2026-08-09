@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#2456d6"/>
+  <!-- Гантель — тримаємо форму в безпечній зоні (центральні ~80%) для maskable -->
+  <g stroke="#ffffff" stroke-width="34" stroke-linecap="round">
+    <line x1="120" y1="256" x2="392" y2="256"/>
+  </g>
+  <g fill="#ffffff">
+    <rect x="86" y="176" width="46" height="160" rx="14"/>
+    <rect x="380" y="176" width="46" height="160" rx="14"/>
+    <rect x="130" y="206" width="26" height="100" rx="8"/>
+    <rect x="356" y="206" width="26" height="100" rx="8"/>
+  </g>
+</svg>

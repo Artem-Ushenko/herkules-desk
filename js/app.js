@@ -5,7 +5,8 @@ import { initClients, onShowClients } from './clients.js';
 import { initSales, onShowSales } from './sales.js';
 import { initJournal, onShowJournal } from './journal.js';
 import { initSettings, onShowSettings } from './settings.js';
-import { initBackup, bindUnloadBackup, onStatusChange, formatStatus } from './backup.js';
+import { initBackup, bindUnloadBackup, onStatusChange, formatStatus, writeBackup } from './backup.js';
+import { autoCloseStaleVisits } from './visits.js';
 
 const SCREENS = {
   desk: { onShow: () => focusScan() },
@@ -56,3 +57,24 @@ setInterval(renderBackupStatus, 60000); // «3 дні тому» має рост
 
 initBackup();
 bindUnloadBackup();
+
+// Автозакриття о CLOSE_TIME (розділ 3.5): перевіряємо щохвилини, а не лише
+// на скані — застосунок працює цілий день, адмін може весь час бути на
+// іншому екрані. Автозакриття = «закриття зміни» → одразу бекап (розділ 6).
+async function runAutoClose() {
+  const closed = await autoCloseStaleVisits();
+  if (closed > 0) {
+    writeBackup();
+    document.dispatchEvent(new CustomEvent('herkules:visits-changed'));
+  }
+}
+runAutoClose();
+setInterval(runAutoClose, 60000);
+
+// Service Worker: офлайн-режим (розділ 1, M5). Шлях відносний — коректно
+// реєструється і в корені, і під підпапкою на GitHub Pages.
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
+}
