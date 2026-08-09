@@ -26,6 +26,14 @@ python -m http.server 8080
 
 Детальна інструкція розгортання на міні-ПК — у `DEPLOY.md` (зʼявиться на етапі M6).
 
+## Тести
+
+Без залежностей і без збірки. Відкрийте `tests/index.html` через локальний сервер — або в Node:
+
+```
+node -e "import('./tests/access.test.js').then(async()=>{const{runAll}=await import('./tests/runner.js');const r=await runAll();console.log(r.failed?'FAILED':'OK',r.passed+'/'+(r.passed+r.failed));process.exit(r.failed?1:0)})"
+```
+
 ## Ліцензія
 
 MIT
