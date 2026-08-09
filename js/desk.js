@@ -43,6 +43,8 @@ export function initDesk(container) {
   refreshInGym();
   // Тривалість «скільки вже в залі» оновлюється раз на пів хвилини
   setInterval(refreshInGym, 30000);
+  // Автозакриття (app.js) міняє список візитів поза скануванням — оновити одразу
+  document.addEventListener('herkules:visits-changed', refreshInGym);
 }
 
 // ── Обробка сканування ──

@@ -71,3 +71,30 @@ async function logAdminAction(action, details) {
   log.push({ at: new Date().toISOString(), action, details });
   await put(STORES.meta, { key: 'adminLog', value: log });
 }
+
+// Автозакриття о CLOSE_TIME (правило 3.5): «хто зараз у залі» має бути
+// правдивим, вчорашні привиди неприпустимі. Межа закриття рахується від
+// календарного дня входу — так само коректно закриває і сьогоднішні
+// відкриті візити, і ті, що лишились відкритими з минулих сеансів роботи
+// застосунку (наприклад, якщо міні-ПК був вимкнений опівночі).
+function closeBoundary(checkInTs) {
+  const [h, m] = CONFIG.CLOSE_TIME.split(':').map(Number);
+  const d = new Date(checkInTs);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m, 0, 0).getTime();
+}
+
+export async function autoCloseStaleVisits(now = Date.now()) {
+  const open = await listOpenVisits();
+  let closed = 0;
+  for (const v of open) {
+    if (now >= closeBoundary(v.checkIn)) {
+      // Тривалість не рахується — checkOut лишається null (правило 3.5)
+      v.checkOut = null;
+      v.autoClosed = true;
+      delete v.open;
+      await put(STORES.visits, v);
+      closed++;
+    }
+  }
+  return closed;
+}
