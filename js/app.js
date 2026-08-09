@@ -1,25 +1,32 @@
-// Точка входу: перемикання екранів і повернення фокуса в поле сканування.
+// Точка входу: маршрути екранів і повернення фокуса в поле сканування.
 
 import { initDesk, focusScan } from './desk.js';
+import { initClients, onShowClients } from './clients.js';
+import { initSales, onShowSales } from './sales.js';
+import { initJournal, onShowJournal } from './journal.js';
+import { initSettings, onShowSettings } from './settings.js';
 
-const SCREENS = ['desk', 'clients', 'sales', 'journal', 'settings'];
+const SCREENS = {
+  desk: { onShow: () => focusScan() },
+  clients: { onShow: onShowClients },
+  sales: { onShow: onShowSales },
+  journal: { onShow: onShowJournal },
+  settings: { onShow: onShowSettings }
+};
 
-function currentScreen() {
-  const name = location.hash.slice(1).split('/')[0];
-  return SCREENS.includes(name) ? name : 'desk';
-}
-
-function show(name) {
-  for (const s of SCREENS) {
-    document.getElementById('screen-' + s).hidden = s !== name;
+function route() {
+  const [name, ...rest] = location.hash.slice(1).split('/');
+  const screen = SCREENS[name] ? name : 'desk';
+  for (const s of Object.keys(SCREENS)) {
+    document.getElementById('screen-' + s).hidden = s !== screen;
   }
   document.querySelectorAll('#nav a').forEach(a =>
-    a.classList.toggle('active', a.dataset.screen === name)
+    a.classList.toggle('active', a.dataset.screen === screen)
   );
-  if (name === 'desk') focusScan();
+  SCREENS[screen].onShow(rest.join('/') || undefined);
 }
 
-window.addEventListener('hashchange', () => show(currentScreen()));
+window.addEventListener('hashchange', route);
 
 // Клік будь-де на порожньому місці стійки повертає фокус сканеру (розділ 5.1)
 document.addEventListener('click', (e) => {
@@ -28,4 +35,8 @@ document.addEventListener('click', (e) => {
 });
 
 initDesk(document.getElementById('screen-desk'));
-show(currentScreen());
+initClients(document.getElementById('screen-clients'));
+initSales(document.getElementById('screen-sales'));
+initJournal(document.getElementById('screen-journal'));
+initSettings(document.getElementById('screen-settings'));
+route();
