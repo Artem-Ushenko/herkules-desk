@@ -1,0 +1,600 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Геркулес Клуб — інструкція користувача</title>
+<meta name="description" content="Як користуватись системою обліку клієнтів: стійка, клієнти, продажі, журнал, налаштування.">
+<style>
+  :root {
+    --ink: #1a1d21;
+    --ink-soft: #545b64;
+    --ink-faint: #8188a1;
+    --paper: #f5f6f8;
+    --surface: #ffffff;
+    --surface-raised: #ffffff;
+    --line: #dde1e6;
+    --line-soft: #e9ebee;
+    --accent: #2456d6;
+    --accent-ink: #17408f;
+    --accent-soft: #e8eefc;
+    --ok: #1a7f37;
+    --ok-bg: #d8f3df;
+    --ok-line: #b7e4c3;
+    --warn: #8a5d00;
+    --warn-bg: #fff3c2;
+    --warn-line: #f0dd8f;
+    --deny: #b91c28;
+    --deny-bg: #ffe0e3;
+    --deny-line: #f3b9c0;
+    --shadow: 0 1px 2px rgba(20, 24, 33, 0.04), 0 8px 24px -12px rgba(20, 24, 33, 0.12);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #e8eaed;
+      --ink-soft: #aab0bb;
+      --ink-faint: #737a87;
+      --paper: #14171c;
+      --surface: #1b1f26;
+      --surface-raised: #20242c;
+      --line: #2c3138;
+      --line-soft: #262b32;
+      --accent: #6d95ee;
+      --accent-ink: #cddaf9;
+      --accent-soft: #1c2740;
+      --ok: #55c473;
+      --ok-bg: #123322;
+      --ok-line: #21593a;
+      --warn: #e0b34a;
+      --warn-bg: #3a2f0e;
+      --warn-line: #6b551b;
+      --deny: #f0707a;
+      --deny-bg: #3c1418;
+      --deny-line: #6b2530;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ink: #e8eaed;
+    --ink-soft: #aab0bb;
+    --ink-faint: #737a87;
+    --paper: #14171c;
+    --surface: #1b1f26;
+    --surface-raised: #20242c;
+    --line: #2c3138;
+    --line-soft: #262b32;
+    --accent: #6d95ee;
+    --accent-ink: #cddaf9;
+    --accent-soft: #1c2740;
+    --ok: #55c473;
+    --ok-bg: #123322;
+    --ok-line: #21593a;
+    --warn: #e0b34a;
+    --warn-bg: #3a2f0e;
+    --warn-line: #6b551b;
+    --deny: #f0707a;
+    --deny-bg: #3c1418;
+    --deny-line: #6b2530;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .mono {
+    font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+  }
+
+  a { color: var(--accent); }
+  a:focus-visible, button:focus-visible, input:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  .layout {
+    display: grid;
+    grid-template-columns: 236px minmax(0, 760px);
+    gap: 0 3rem;
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 2.5rem 2rem 6rem;
+  }
+
+  /* ── Зміст (sticky-рейка) ── */
+
+  .toc {
+    position: sticky;
+    top: 2.5rem;
+    align-self: start;
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    font-size: 0.9rem;
+  }
+
+  .toc .toc-title {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 0.6rem;
+  }
+
+  .toc a {
+    color: var(--ink-soft);
+    text-decoration: none;
+    padding: 0.35rem 0.7rem;
+    border-radius: 7px;
+    border-left: 2px solid transparent;
+  }
+
+  .toc a:hover { background: var(--line-soft); color: var(--ink); }
+
+  /* ── Заголовна частина ── */
+
+  .doc-head { margin-bottom: 2.25rem; }
+
+  .eyebrow {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 0.6rem;
+  }
+
+  h1 {
+    font-family: "Segoe UI Semibold", "Segoe UI", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: clamp(2rem, 1.6rem + 1.6vw, 2.6rem);
+    line-height: 1.08;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.75rem;
+    text-wrap: balance;
+  }
+
+  .lede {
+    font-size: 1.09rem;
+    color: var(--ink-soft);
+    max-width: 62ch;
+    margin: 0;
+  }
+
+  h2 {
+    font-family: "Segoe UI Semibold", "Segoe UI", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    letter-spacing: -0.005em;
+    margin: 0 0 0.3rem;
+    text-wrap: balance;
+  }
+
+  h3 {
+    font-family: "Segoe UI Semibold", "Segoe UI", system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 1.05rem;
+    margin: 1.6rem 0 0.6rem;
+  }
+
+  .section-kicker {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 0.35rem;
+  }
+
+  section.screen {
+    padding: 3.25rem 0;
+    border-top: 1px solid var(--line);
+    scroll-margin-top: 1.5rem;
+  }
+
+  section.screen:first-of-type { border-top: none; }
+
+  section.screen > .lede {
+    margin: 0.6rem 0 1.6rem;
+    max-width: 60ch;
+  }
+
+  p { margin: 0 0 1rem; max-width: 65ch; }
+  ul, ol { margin: 0 0 1rem; padding-left: 1.35rem; max-width: 62ch; }
+  li { margin-bottom: 0.4rem; }
+  li:last-child { margin-bottom: 0; }
+  strong { font-weight: 600; }
+
+  /* ── Кнопки/елементи інтерфейсу згадані в тексті ── */
+
+  kbd, .ui-label {
+    font-family: ui-monospace, "Cascadia Code", "Consolas", monospace;
+    font-size: 0.86em;
+    background: var(--line-soft);
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 0.05em 0.42em;
+    white-space: nowrap;
+  }
+
+  /* ── Картки-примітки (тон застосунку: .box) ── */
+
+  .box {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 1.1rem 1.3rem;
+    margin: 1.1rem 0;
+    box-shadow: var(--shadow);
+  }
+
+  .box > *:last-child { margin-bottom: 0; }
+  .box-title { font-weight: 600; margin: 0 0 0.4rem; display: flex; align-items: center; gap: 0.5rem; }
+
+  .box.tip { border-left: 3px solid var(--accent); }
+  .box.warn-box { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn); }
+  .box.warn-box .box-title, .box.warn-box strong { color: var(--warn); }
+  .box.warn-box p, .box.warn-box li { color: var(--warn); }
+
+  /* ── Вердикт-легенда ── */
+
+  .verdict-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.85rem;
+    margin: 1.4rem 0 0.5rem;
+  }
+
+  @media (max-width: 640px) {
+    .verdict-row { grid-template-columns: 1fr; }
+  }
+
+  .verdict-card {
+    border-radius: 12px;
+    padding: 1rem 1.1rem;
+    border: 1px solid;
+  }
+
+  .verdict-card .vc-label {
+    font-family: "Segoe UI Semibold", "Segoe UI", system-ui, sans-serif;
+    font-weight: 700;
+    font-size: 1.05rem;
+    margin-bottom: 0.3rem;
+  }
+
+  .verdict-card .vc-desc { font-size: 0.9rem; }
+  .verdict-card.vc-ok { background: var(--ok-bg); border-color: var(--ok-line); color: var(--ok); }
+  .verdict-card.vc-warn { background: var(--warn-bg); border-color: var(--warn-line); color: var(--warn); }
+  .verdict-card.vc-deny { background: var(--deny-bg); border-color: var(--deny-line); color: var(--deny); }
+  .verdict-card .vc-desc { color: inherit; opacity: 0.88; }
+
+  /* ── Покроково ── */
+
+  .steps {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1rem;
+    counter-reset: step;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding-left: 2.4rem;
+    max-width: 60ch;
+  }
+
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 0.05em;
+    width: 1.65rem;
+    height: 1.65rem;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    font-weight: 700;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── Дефінішн-лист функцій екрана ── */
+
+  dl.feature-list { margin: 0 0 1rem; }
+  dl.feature-list dt {
+    font-weight: 600;
+    margin-top: 0.9rem;
+  }
+  dl.feature-list dt:first-child { margin-top: 0; }
+  dl.feature-list dd {
+    margin: 0.15rem 0 0;
+    color: var(--ink-soft);
+    max-width: 60ch;
+  }
+
+  /* ── Мала таблиця фільтрів ── */
+
+  .table-wrap { overflow-x: auto; margin: 1rem 0; }
+  table.compact-table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.92rem;
+  }
+  table.compact-table th, table.compact-table td {
+    text-align: left;
+    padding: 0.5rem 0.8rem;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  table.compact-table th {
+    color: var(--ink-faint);
+    font-weight: 700;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+  table.compact-table tr:last-child td { border-bottom: none; }
+
+  /* ── FAQ ── */
+
+  .faq-item { margin: 0 0 1.4rem; }
+  .faq-q {
+    font-family: "Segoe UI Semibold", "Segoe UI", system-ui, sans-serif;
+    font-weight: 600;
+    font-size: 1.02rem;
+    margin: 0 0 0.3rem;
+    color: var(--ink);
+  }
+  .faq-a { margin: 0; color: var(--ink-soft); max-width: 60ch; }
+
+  footer.doc-footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--line);
+    color: var(--ink-faint);
+    font-size: 0.85rem;
+  }
+
+  /* ── Мобільна розкладка: TOC згортається у горизонтальний скролер ── */
+
+  @media (max-width: 860px) {
+    .layout {
+      grid-template-columns: 1fr;
+      padding: 0 0 4rem;
+    }
+    .toc {
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      flex-direction: row;
+      overflow-x: auto;
+      background: var(--paper);
+      border-bottom: 1px solid var(--line);
+      padding: 0.7rem 1.25rem;
+      gap: 0.3rem;
+      -webkit-overflow-scrolling: touch;
+    }
+    .toc .toc-title { display: none; }
+    .toc a { flex: none; white-space: nowrap; }
+    main { padding: 0 1.25rem; }
+    .doc-head { margin-top: 1.75rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="layout">
+  <nav class="toc" aria-label="Зміст">
+    <p class="toc-title">Зміст</p>
+    <a href="#verdicts">Вердикт стійки</a>
+    <a href="#stand">Стійка</a>
+    <a href="#clients">Клієнти</a>
+    <a href="#sales">Продажі</a>
+    <a href="#journal">Журнал</a>
+    <a href="#settings">Налаштування</a>
+    <a href="#faq">Часті ситуації</a>
+  </nav>
+
+  <main>
+    <header class="doc-head">
+      <p class="eyebrow">Інструкція користувача</p>
+      <h1>Геркулес Клуб</h1>
+      <p class="lede">
+        П'ять екранів: <strong>Стійка</strong> для щоденної роботи на вході, і чотири довідкові —
+        <strong>Клієнти</strong>, <strong>Продажі</strong>, <strong>Журнал</strong>, <strong>Налаштування</strong>.
+        Дані зберігаються прямо в браузері й нікуди не надсилаються; регулярний бекап — окремим пунктом
+        у Налаштуваннях.
+      </p>
+    </header>
+
+    <section id="verdicts" class="screen">
+      <p class="section-kicker">Головне, що варто запам'ятати</p>
+      <h2>Три кольори вердикту</h2>
+      <p class="lede">Після кожного сканування картки стійка одразу показує один із трьох станів — великим текстом, видно з двох метрів.</p>
+
+      <div class="verdict-row">
+        <div class="verdict-card vc-ok">
+          <div class="vc-label">Зелений — ПРОХОДЬ</div>
+          <div class="vc-desc">Абонемент у нормі. Візит уже списано, нічого додатково робити не треба.</div>
+        </div>
+        <div class="verdict-card vc-warn">
+          <div class="vc-label">Жовтий — ПРОХОДЬ ⚠</div>
+          <div class="vc-desc">Пускаємо, але абонемент скоро закінчиться — залишилось ≤3 дні або ≤2 візити. Варто нагадати клієнту.</div>
+        </div>
+        <div class="verdict-card vc-deny">
+          <div class="vc-label">Червоний — СТОП</div>
+          <div class="vc-desc">Не пускаємо. Причина написана під вердиктом; поруч одразу кнопка «Продати абонемент».</div>
+        </div>
+      </div>
+    </section>
+
+    <section id="stand" class="screen">
+      <p class="section-kicker">Екран за замовчуванням</p>
+      <h2>Стійка</h2>
+      <p class="lede">Поле сканування завжди в фокусі — сканер працює як клавіатура і сам надсилає код. Клік будь-де на порожньому місці повертає фокус у поле.</p>
+
+      <h3>Один скан — перемикач</h3>
+      <ul>
+        <li>Клієнта немає в залі → скан оформлює <strong>вхід</strong> і одразу списує візит.</li>
+        <li>Клієнт уже в залі → повторний скан тієї ж картки оформлює <strong>вихід</strong>. Візит на вході, а не на виході — щоб він не загубився, якщо людина піде не відсканувавшись.</li>
+      </ul>
+
+      <h3>Скасувати вхід</h3>
+      <p>Кнопка <span class="ui-label">Скасувати вхід</span> зʼявляється одразу під вердиктом після входу і повертає списаний візит на баланс.</p>
+      <div class="box tip">
+        <p class="box-title">Діє 5 хвилин</p>
+        <p>Помилилися карткою — тисніть одразу. Після 5 хвилин кнопка попросить підтвердження другим кліком і залогує скасування окремо: це вже вважається діями адміністратора, а не звичайним виправленням.</p>
+      </div>
+
+      <h3>Невідома картка</h3>
+      <p>Якщо код не знайдено — стійка одразу пропонує форму: імʼя, телефон, згода на обробку персональних даних. Так можна заздалегідь роздати надруковані картки, а завести клієнта — вже під час першого приходу.</p>
+
+      <h3>«У залі зараз»</h3>
+      <p>Під полем сканування — плитки всіх, хто зараз усередині: імʼя, тип (клієнт / гість орендаря / тренер), час входу і скільки вже триває тренування. Список оновлюється сам.</p>
+      <div class="box warn-box">
+        <p class="box-title">Автозакриття о 23:00</p>
+        <p>Якщо клієнт пішов, не відсканувавшись на виході, система сама закриє його візит о призначеній годині закриття залу. Такі візити в журналі позначені окремо як автозакриті — це показник дисципліни сканування, не привід лишати «У залі зараз» неправдивим.</p>
+      </div>
+    </section>
+
+    <section id="clients" class="screen">
+      <p class="section-kicker">Реєстр і картки</p>
+      <h2>Клієнти</h2>
+      <p class="lede">Таблиця всіх клієнтів клубу з пошуком і фільтрами; клік по рядку відкриває картку.</p>
+
+      <h3>Пошук і фільтри</h3>
+      <p>Пошук працює по імені, телефону або номеру картки одночасно. Фільтр звужує список:</p>
+      <div class="table-wrap">
+        <table class="compact-table">
+          <thead><tr><th>Фільтр</th><th>Що показує</th></tr></thead>
+          <tbody>
+            <tr><td>Активні</td><td>Абонемент діє, допуск дозволено</td></tr>
+            <tr><td>Спливають</td><td>≤3 дні або ≤2 візити до кінця</td></tr>
+            <tr><td>Прострочені</td><td>Немає абонемента або термін/візити вичерпано</td></tr>
+            <tr><td>Ветерани</td><td>Позначка «ветеран» в анкеті</td></tr>
+            <tr><td>Гості орендаря</td><td>Прийшли не до клубу, а до тренера напряму</td></tr>
+            <tr><td>Зараз у залі</td><td>Хто щойно відсканувався і ще не вийшов</td></tr>
+            <tr><td>Архів</td><td>Клієнти, переведені в архів (не видалені)</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Картка клієнта</h3>
+      <div class="box warn-box">
+        <p class="box-title">⚕ Медичні нотатки — перший блок картки</p>
+        <p>Навмисно вище абонемента й історії: тренер має побачити обмеження до початку заняття, а не шукати їх через три кліки.</p>
+      </div>
+
+      <dl class="feature-list">
+        <dt>Продаж абонемента</dt>
+        <dd>У блоці «Абонемент» — вибір тарифу, спосіб оплати (готівка / картка), дата початку і, за бажанням одразу, номер фіскального чека. Кнопка <span class="ui-label">Продати</span> одразу створює запис оплати — його вже не можна відредагувати, лише сторнувати з екрана «Продажі».</dd>
+        <dt>Заморозка / розморозка</dt>
+        <dd>Причина «На службі» — без обмеження днів. «Травма» і «Інше» — в межах ліміту, який показано поруч («використано N з 30 дн.»). Розморозка сама подовжує дату закінчення абонемента на кількість фактично заморожених днів.</dd>
+        <dt>Друк клубної картки</dt>
+        <dd>Кнопка <span class="ui-label">🖨 Друк картки</span> формує картку 86×54 мм зі штрих-кодом, номером і QR-дублем (щоб клієнт міг показати номер із телефону, якщо забув картку).</dd>
+        <dt>В архів / Видалити назавжди</dt>
+        <dd>Архів — оборотний, ховає клієнта зі звичайних списків. Видалення — незворотне, стирає і всю історію візитів та оплат; кнопка озброюється лише після повторного натискання.</dd>
+      </dl>
+
+      <h3>Експорт CSV</h3>
+      <p>Дві окремі кнопки: звичайний список і — окремо, з попередженням — список <strong>із медичними нотатками</strong>. Це чутливі дані, тому випадково їх не експортувати.</p>
+    </section>
+
+    <section id="sales" class="screen">
+      <p class="section-kicker">Гроші клубу</p>
+      <h2>Продажі</h2>
+      <p class="lede">Усі оплати за обраний період, сума разом і експорт CSV. Оплати гостей орендаря сюди не потрапляють — їхні гроші йдуть напряму тренеру, повз рахунок клубу.</p>
+
+      <h3>Номер фіскального чека</h3>
+      <p>Поле заповнюється вручну після того, як чек пробито в Checkbox — це єдине, що можна дозаповнити в уже створеному записі оплати.</p>
+
+      <h3>Сторно замість правки</h3>
+      <div class="box tip">
+        <p>Історичні записи оплат не редагуються і не видаляються. Помилились сумою чи тарифом — кнопка <span class="ui-label">Сторно</span> створює компенсуючий запис зі знаком мінус і посиланням на оригінал. Це залишає повну паперову доріжку для звірки.</p>
+      </div>
+    </section>
+
+    <section id="journal" class="screen">
+      <p class="section-kicker">Хто і коли заходив</p>
+      <h2>Журнал</h2>
+      <p class="lede">Усі візити з фільтрами за датою і клієнтом, автозакриті — з окремою позначкою.</p>
+      <div class="box warn-box">
+        <p class="box-title">Доба звіту ≠ календарна доба</p>
+        <p>Візит, що почався о 22:40, повністю належить цьому дню — межа доби прив'язана до часу відкриття/закриття залу, а не до півночі.</p>
+      </div>
+      <p>Експорт CSV доступний для будь-якого обраного періоду.</p>
+    </section>
+
+    <section id="settings" class="screen">
+      <p class="section-kicker">Тарифи і бекап</p>
+      <h2>Налаштування</h2>
+
+      <h3>Тарифи</h3>
+      <p>Назва, кількість візитів (порожньо — безліміт), термін дії в днях, ціна, позначка «для ветеранів». Тариф можна видалити, якщо він більше не пропонується — це не зачепить уже продані абонементи.</p>
+
+      <h3>Бекап</h3>
+      <p>Індикатор у самій шапці застосунку показує стан завжди: <span class="ui-label">Копія: 14:22 ✓</span> зеленим або <span class="ui-label">Копія: 3 дні тому ⚠</span> червоним.</p>
+
+      <ol class="steps">
+        <li>Перше налаштування — кнопка <span class="ui-label">Обрати папку бекапів</span>, вказати синхронізовану теку Google Диска.</li>
+        <li>Далі копії пишуться самі: за розкладом, і додатково при закритті зміни та закритті вкладки.</li>
+        <li>Якщо доступ до теки загубився (перейменували, від'єднали диск) — з'явиться кнопка <span class="ui-label">Вказати папку заново</span>. Робота стійки при цьому не зупиняється.</li>
+      </ol>
+
+      <h3>Відновлення з файлу</h3>
+      <p>Оберіть JSON-файл бекапу — застосунок покаже, скільки в ньому клієнтів, візитів і оплат та на яку дату знімок, і лише після повторного підтвердження замінить поточну базу.</p>
+    </section>
+
+    <section id="faq" class="screen">
+      <p class="section-kicker">Швидкий пошук відповіді</p>
+      <h2>Часті ситуації</h2>
+
+      <div class="faq-item">
+        <p class="faq-q">Червоний вердикт, хоча клієнт каже, що заплатив</p>
+        <p class="faq-a">Відкрити картку клієнта (клік по імені у вердикті чи через «Клієнти») і перевірити блок «Абонемент» — можливо оплата ще не проведена в системі або абонемент заморожено.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Гість орендаря — куди його заводити?</p>
+        <p class="faq-a">Тип клієнта «Гість орендаря», з полем «До кого прийшов». Абонемент йому не потрібен і не перевіряється — він проходить одразу зеленим.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Клієнт пішов, забувши відсканувати вихід</p>
+        <p class="faq-a">Нічого робити не треба: о 23:00 система сама закриє візит і позначить його автозакритим у журналі.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Помилково відсканували не ту картку</p>
+        <p class="faq-a">Одразу — <span class="ui-label">Скасувати вхід</span> під вердиктом, поки не минуло 5 хвилин.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">У шапці червоний індикатор бекапу</p>
+        <p class="faq-a">Робота застосунку від цього не зупиняється. Зайти в Налаштування → Бекап і натиснути «Вказати папку заново» — зазвичай це означає, що Google Диск для комп'ютерів перевантажився або тека тимчасово недоступна.</p>
+      </div>
+      <div class="faq-item">
+        <p class="faq-q">Пропав інтернет</p>
+        <p class="faq-a">Стійка й усі екрани працюють повністю офлайн — база локальна. Бекап на Google Диск підхопиться сам, щойно звʼязок відновиться.</p>
+      </div>
+    </section>
+
+    <footer class="doc-footer">
+      Геркулес Клуб · Харківське шосе, 172Б, Київ
+    </footer>
+  </main>
+</div>
+</body>
+</html>

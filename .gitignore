@@ -1,6 +1,8 @@
 # Дані клієнтів і бекапи ніколи не потрапляють у публічний репозиторій
 *.json
-!manifest.json
+!package.json
+!package-lock.json
 
 .DS_Store
 node_modules/
+dist/
