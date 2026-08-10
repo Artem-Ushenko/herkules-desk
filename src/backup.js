@@ -14,13 +14,6 @@ let statusListeners = [];
 
 // ── Стан для індикатора в шапці ──
 
-function nowState() {
-  return {
-    configured: !!dirHandle,
-    permissionOk: true, // оновлюється explicitно нижче, тут лише каркас
-  };
-}
-
 let state = { configured: false, permissionOk: false, lastBackupAt: null, lastError: null };
 
 function emit() {

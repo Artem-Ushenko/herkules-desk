@@ -2,36 +2,46 @@
 
 Локальна система обліку клієнтів для міні фітнес-студії: допуск за клубною карткою, абонементи, візити, оплати, бекапи на Google Диск.
 
-- Без бекенду: вся база — в IndexedDB браузера
-- Без збірки та npm-залежностей: vanilla JS, ES-модулі
-- Працює офлайн (PWA + Service Worker)
+- Без бекенду: вся база — в IndexedDB браузера (через `idb`)
+- React 18 + Vite 5, без роутера — навігація через `location.hash`
+- Працює офлайн (PWA + Service Worker, `vite-plugin-pwa`)
 - Бекапи через File System Access API у синхронізовану папку Google Drive
+- Той самий стек, що й сестринський проєкт екосистеми — «Геркулес Шоп» (POS спортхарчування)
 
-## Як запустити локально
-
-File System Access API потребує secure context, тому просте відкриття `index.html` з диска не підійде для бекапів. Запустіть будь-який статичний сервер:
+## Як запустити локально (розробка/тест)
 
 ```
-python -m http.server 8080
+npm install
+npm run dev
 ```
 
-і відкрийте `http://localhost:8080` (localhost вважається secure context).
+і відкрийте адресу, яку виведе Vite (типово `http://localhost:5173`).
+File System Access API потребує secure context — `localhost` підходить.
 
-## Як розгорнути на GitHub Pages
+## Продакшн на міні-ПК
 
-1. Fork або push цього репозиторію на GitHub
-2. Settings → Pages → Source: гілка `main`, папка `/ (root)`
-3. Через хвилину застосунок доступний за адресою `https://<user>.github.io/herkules-desk/`
-4. На робочому міні-ПК: відкрити адресу в Chrome → меню → «Встановити застосунок»
+Робоча система на стійці працює повністю локально: git-клон репозиторію +
+збірка (`npm install`, `npm run build`) + `start-desk.bat`, без GitHub
+Pages і без залежності від інтернету для щоденного запуску. Оновлення
+коду — через `update.bat` (`git pull` + `npm run build`), вручну, за
+потреби.
 
-Детальна інструкція розгортання на міні-ПК — у [`DEPLOY.md`](DEPLOY.md).
+Детальна покрокова інструкція розгортання — у [`DEPLOY.md`](DEPLOY.md).
+Інструкція користувача для адміністратора на стійці — у [`USAGE.html`](USAGE.html) (відкрити прямо в браузері).
 
 ## Тести
 
-Без залежностей і без збірки. Відкрийте `tests/index.html` через локальний сервер — або в Node:
+```
+npm test
+```
+
+Vitest + jsdom, `src/access.test.js` — 21 тест на бізнес-правила допуску
+(розділ 3.1 ТЗ).
+
+## Лінт
 
 ```
-node -e "import('./tests/access.test.js').then(async()=>{const{runAll}=await import('./tests/runner.js');const r=await runAll();console.log(r.failed?'FAILED':'OK',r.passed+'/'+(r.passed+r.failed));process.exit(r.failed?1:0)})"
+npm run lint
 ```
 
 ## Ліцензія

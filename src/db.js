@@ -1,5 +1,8 @@
-// Шар IndexedDB: схема, міграції, CRUD.
+// Шар IndexedDB: схема, міграції, CRUD. Через обгортку idb (як у сестринському
+// проєкті — Геркулес Шоп), контракт функцій той самий, що й у vanilla-версії.
 // База локальна і єдина; жодних зовнішніх сервісів (розділ 1 специфікації).
+
+import { openDB as idbOpenDB } from 'idb';
 
 export const DB_NAME = 'herkules';
 export const DB_VERSION = 1;
@@ -40,63 +43,54 @@ function migrate(db, oldVersion) {
 
 export function openDB() {
   if (dbPromise) return dbPromise;
-  dbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (e) => migrate(req.result, e.oldVersion);
-    req.onsuccess = () => {
-      const db = req.result;
-      // Якщо інша вкладка оновить схему — закриваємось, щоб не блокувати її
-      db.onversionchange = () => db.close();
-      resolve(db);
-    };
-    req.onerror = () => reject(req.error);
-    req.onblocked = () => reject(new Error('База заблокована іншою вкладкою'));
+  let rejectBlocked;
+  const blockedPromise = new Promise((_, reject) => { rejectBlocked = reject; });
+  const idbPromise = idbOpenDB(DB_NAME, DB_VERSION, {
+    upgrade(db, oldVersion) {
+      migrate(db, oldVersion);
+    },
+    // Якщо інша вкладка оновить схему — закриваємось, щоб не блокувати її
+    blocking() {
+      idbPromise.then((db) => db.close());
+    },
+    blocked() {
+      rejectBlocked(new Error('База заблокована іншою вкладкою'));
+    }
   });
+  dbPromise = Promise.race([idbPromise, blockedPromise]);
   return dbPromise;
-}
-
-function requestToPromise(req) {
-  return new Promise((resolve, reject) => {
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-
-async function withStore(storeName, mode, fn) {
-  const db = await openDB();
-  const tx = db.transaction(storeName, mode);
-  const result = await fn(tx.objectStore(storeName));
-  return new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve(result);
-    tx.onerror = () => reject(tx.error);
-    tx.onabort = () => reject(tx.error);
-  });
 }
 
 // ── CRUD ──
 
-export function get(store, id) {
-  return withStore(store, 'readonly', (s) => requestToPromise(s.get(id)));
+export async function get(store, id) {
+  const db = await openDB();
+  return db.get(store, id);
 }
 
-export function getAll(store) {
-  return withStore(store, 'readonly', (s) => requestToPromise(s.getAll()));
+export async function getAll(store) {
+  const db = await openDB();
+  return db.getAll(store);
 }
 
-export function getAllByIndex(store, indexName, value) {
-  return withStore(store, 'readonly', (s) => requestToPromise(s.index(indexName).getAll(value)));
+export async function getAllByIndex(store, indexName, value) {
+  const db = await openDB();
+  return db.getAllFromIndex(store, indexName, value);
 }
 
-export function put(store, record) {
-  return withStore(store, 'readwrite', (s) => requestToPromise(s.put(record)));
+export async function put(store, record) {
+  const db = await openDB();
+  return db.put(store, record);
 }
 
-export function remove(store, id) {
-  return withStore(store, 'readwrite', (s) => requestToPromise(s.delete(id)));
+export async function remove(store, id) {
+  const db = await openDB();
+  return db.delete(store, id);
 }
 
-export function clear(store) {
-  return withStore(store, 'readwrite', (s) => requestToPromise(s.clear()));
+export async function clear(store) {
+  const db = await openDB();
+  return db.clear(store);
 }
 
 // ── Службове ──
