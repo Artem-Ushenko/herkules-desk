@@ -1,4 +1,5 @@
-// Екран «Налаштування»: тарифи (M3); папка бекапів і відновлення — M4.
+// Екран «Налаштування»: тарифи (M3); папка бекапів і відновлення — M4;
+// зміни чергування (облік/звітність, без каси) — shifts.js.
 
 import { useEffect, useState } from 'react';
 import { CONFIG } from '../config.js';
@@ -10,6 +11,10 @@ import {
   formatStatus, pickFolder, reconfirmPermission,
   writeBackup, getFolderName, readBackupFile, restoreFromSnapshot
 } from '../backup.js';
+import {
+  getCurrentShift, getStaffList, addStaffName,
+  openShift, closeCurrentShift, getRecentClosedShifts
+} from '../shifts.js';
 
 function TariffsBox() {
   const [tariffs, setTariffs] = useState([]);
@@ -69,6 +74,143 @@ function TariffsBox() {
         </label>
         <button type="submit" className="btn-primary">Додати</button>
       </form>
+    </div>
+  );
+}
+
+function ShiftBox() {
+  const [shift, setShift] = useState(undefined); // undefined — ще не завантажено
+  const [staffList, setStaffList] = useState([]);
+  const [recent, setRecent] = useState([]);
+  const [newName, setNewName] = useState('');
+  const [showAdd, setShowAdd] = useState(false);
+  const [error, setError] = useState(null);
+  const [busy, setBusy] = useState(false);
+  const [closedInfo, setClosedInfo] = useState(null);
+
+  const load = async () => {
+    const [cur, staff, rec] = await Promise.all([getCurrentShift(), getStaffList(), getRecentClosedShifts()]);
+    setShift(cur);
+    setStaffList(staff);
+    setRecent(rec);
+  };
+  useEffect(() => { load(); }, []);
+
+  const notifyChanged = () => document.dispatchEvent(new CustomEvent('herkules:shift-changed'));
+
+  const handleOpen = async (staff) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await openShift(staff);
+      notifyChanged();
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleClose = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const closed = await closeCurrentShift('staff');
+      setClosedInfo(closed);
+      notifyChanged();
+      await load();
+    } catch (e) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleAddStaff = async (e) => {
+    e.preventDefault();
+    setError(null);
+    try {
+      const updated = await addStaffName(newName);
+      setStaffList(updated);
+      setNewName('');
+      setShowAdd(false);
+    } catch (e) {
+      setError(e.message);
+    }
+  };
+
+  if (shift === undefined) return <div className="box"><h2>Зміна</h2></div>;
+
+  return (
+    <div className="box">
+      <h2>Зміна</h2>
+      <p className="muted">
+        Хто чергував на стійці, скільки візитів і оплат відбулось — облік/звітність,
+        не впливає на допуск за карткою. Готівка й каса — окремо, в «Геркулес Шоп».
+      </p>
+
+      {shift ? (
+        <>
+          <p className="status-ok">
+            👤 {shift.staff} · з {new Date(shift.openedAt).toLocaleTimeString('uk', { hour: '2-digit', minute: '2-digit' })}
+          </p>
+          <ArmedButton
+            label="Закрити зміну"
+            confirmLabel="Точно закрити?"
+            className="btn-primary"
+            onConfirm={handleClose}
+          />
+        </>
+      ) : (
+        <>
+          <div className="inline-form wrap">
+            {staffList.map((name) => (
+              <button key={name} type="button" disabled={busy} onClick={() => handleOpen(name)}>
+                👤 {name}
+              </button>
+            ))}
+          </div>
+          {showAdd ? (
+            <form className="inline-form" onSubmit={handleAddStaff}>
+              <input type="text" autoFocus placeholder="Ім'я" value={newName} onChange={(e) => setNewName(e.target.value)} />
+              <button type="submit" disabled={!newName.trim()}>Додати</button>
+            </form>
+          ) : (
+            <button type="button" className="small" onClick={() => setShowAdd(true)}>+ Додати</button>
+          )}
+        </>
+      )}
+
+      {error && <p className="status-deny">{error}</p>}
+
+      {closedInfo && (
+        <p className="muted">
+          Закрито: {closedInfo.staff} — візитів {closedInfo.visitCount}, оплат {closedInfo.paymentCount}{' '}
+          (готівка {fmtMoney(closedInfo.cashTotal)} · картка {fmtMoney(closedInfo.cardTotal)})
+        </p>
+      )}
+
+      {recent.length > 0 && (
+        <table className="data-table compact" style={{ marginTop: '.75rem' }}>
+          <thead>
+            <tr>{['Хто', 'Відкрито', 'Закрито', 'Візитів', 'Готівка', 'Картка', ''].map((t) => <th key={t}>{t}</th>)}</tr>
+          </thead>
+          <tbody>
+            {recent.map((s) => (
+              <tr key={s.id}>
+                <td>{s.staff}</td>
+                <td>{fmtDateTime(s.openedAt)}</td>
+                <td>{fmtDateTime(s.closedAt)}</td>
+                <td>{s.visitCount}</td>
+                <td>{fmtMoney(s.cashTotal)}</td>
+                <td>{fmtMoney(s.cardTotal)}</td>
+                <td>{s.closedBy === 'system' ? 'авто' : ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   );
 }
@@ -161,6 +303,7 @@ export default function SettingsScreen() {
   return (
     <>
       <TariffsBox />
+      <ShiftBox />
       <BackupBox />
     </>
   );

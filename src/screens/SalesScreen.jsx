@@ -7,6 +7,7 @@ import { STORES, getAll, put } from '../db.js';
 import { toISODate } from '../access.js';
 import { fmtMoney, fmtDateTime, downloadCSV } from '../utils.js';
 import ArmedButton from '../components/ArmedButton.jsx';
+import { currentShiftId } from '../shifts.js';
 
 function defaultFrom() {
   const now = new Date();
@@ -57,7 +58,8 @@ export default function SalesScreen() {
       item: p.item,
       tariffId: p.tariffId,
       fiscalReceiptNo: '',
-      note: 'сторно ' + p.id.slice(0, 8)
+      note: 'сторно ' + p.id.slice(0, 8),
+      shiftId: await currentShiftId()
     });
     load();
   };

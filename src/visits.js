@@ -3,6 +3,7 @@
 
 import { CONFIG } from './config.js';
 import { STORES, get, put, remove, getAllByIndex } from './db.js';
+import { currentShiftId } from './shifts.js';
 
 export function listOpenVisits() {
   return getAllByIndex(STORES.visits, 'open', 1);
@@ -26,7 +27,8 @@ export async function checkIn(client) {
     open: 1,
     autoClosed: false,
     subscriptionTitle: client.subscription ? client.subscription.title : '',
-    clientType: client.type
+    clientType: client.type,
+    shiftId: await currentShiftId() // для звіту чергування (shifts.js) — не блокує вхід, якщо зміни нема
   };
   await put(STORES.visits, visit);
   if (hasCountedVisits(client)) {

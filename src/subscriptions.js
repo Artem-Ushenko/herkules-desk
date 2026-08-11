@@ -3,6 +3,7 @@
 import { CONFIG } from './config.js';
 import { STORES, put } from './db.js';
 import { toISODate } from './access.js';
+import { currentShiftId } from './shifts.js';
 
 export function addDays(iso, days) {
   const d = new Date(iso + 'T12:00:00');
@@ -36,7 +37,8 @@ export async function sellSubscription(client, tariff, { startDate, method, fisc
     item: tariff.title,
     tariffId: tariff.id,
     fiscalReceiptNo,
-    note
+    note,
+    shiftId: await currentShiftId() // для звіту чергування (shifts.js) — не блокує продаж, якщо зміни нема
   };
   await put(STORES.payments, payment);
   return payment;

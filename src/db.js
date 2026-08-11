@@ -5,13 +5,14 @@
 import { openDB as idbOpenDB } from 'idb';
 
 export const DB_NAME = 'herkules';
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
 
 export const STORES = {
   clients: 'clients',
   visits: 'visits',
   payments: 'payments',
   tariffs: 'tariffs',
+  shifts: 'shifts', // чергування адміністратора/рецепціоніста — облік/звітність, БЕЗ каси (розділ shifts.js)
   meta: 'meta' // службові записи: лічильник карток, handle папки бекапів, журнал дій адміністратора
 };
 
@@ -19,7 +20,7 @@ let dbPromise = null;
 
 // Міграції за версіями: switch без break — оновлення з будь-якої старої версії
 // проходить усі наступні кроки. Нова версія схеми = новий case + інкремент DB_VERSION.
-function migrate(db, oldVersion) {
+function migrate(db, oldVersion, transaction) {
   switch (oldVersion) {
     case 0: {
       db.createObjectStore(STORES.clients, { keyPath: 'id' });
@@ -37,6 +38,15 @@ function migrate(db, oldVersion) {
 
       db.createObjectStore(STORES.tariffs, { keyPath: 'id' });
       db.createObjectStore(STORES.meta, { keyPath: 'key' });
+      // falls through — нова БД (oldVersion 0) отримує й наступні кроки одразу
+    }
+    // v2: зміни чергування (shifts.js). shiftId на visits/payments — необов'язкове
+    // поле (записи без відкритої зміни просто не потрапляють в індекс), тому
+    // старі записи з БД v1 лишаються валідними без міграції даних.
+    case 1: {
+      db.createObjectStore(STORES.shifts, { keyPath: 'id' });
+      transaction.objectStore(STORES.visits).createIndex('shiftId', 'shiftId');
+      transaction.objectStore(STORES.payments).createIndex('shiftId', 'shiftId');
     }
   }
 }
@@ -46,8 +56,8 @@ export function openDB() {
   let rejectBlocked;
   const blockedPromise = new Promise((_, reject) => { rejectBlocked = reject; });
   const idbPromise = idbOpenDB(DB_NAME, DB_VERSION, {
-    upgrade(db, oldVersion) {
-      migrate(db, oldVersion);
+    upgrade(db, oldVersion, newVersion, transaction) {
+      migrate(db, oldVersion, transaction);
     },
     // Якщо інша вкладка оновить схему — закриваємось, щоб не блокувати її
     blocking() {
@@ -114,30 +124,35 @@ export async function nextCardId(prefix) {
 
 // Повний знімок бази для бекапу (розділ 6)
 export async function exportSnapshot() {
-  const [clients, visits, payments, tariffs] = await Promise.all([
+  const [clients, visits, payments, tariffs, shifts] = await Promise.all([
     getAll(STORES.clients),
     getAll(STORES.visits),
     getAll(STORES.payments),
-    getAll(STORES.tariffs)
+    getAll(STORES.tariffs),
+    getAll(STORES.shifts)
   ]);
   return {
     format: 'herkules-backup',
     schemaVersion: DB_VERSION,
     exportedAt: new Date().toISOString(),
     cardCounter: await getMeta('cardCounter', 0),
-    clients, visits, payments, tariffs
+    staffList: await getMeta('staffList', []),
+    clients, visits, payments, tariffs, shifts
   };
 }
 
 // Заміна бази вмістом знімка (відновлення з бекапу)
 export async function importSnapshot(snap) {
   if (snap.format !== 'herkules-backup') throw new Error('Це не файл бекапу Геркулеса');
-  for (const store of [STORES.clients, STORES.visits, STORES.payments, STORES.tariffs]) {
+  for (const store of [STORES.clients, STORES.visits, STORES.payments, STORES.tariffs, STORES.shifts]) {
     await clear(store);
   }
   for (const c of snap.clients) await put(STORES.clients, c);
   for (const v of snap.visits) await put(STORES.visits, v);
   for (const p of snap.payments) await put(STORES.payments, p);
   for (const t of snap.tariffs) await put(STORES.tariffs, t);
+  // v1-бекапи (до появи чергувань) не мають shifts/staffList — приймаються як порожні
+  for (const s of snap.shifts || []) await put(STORES.shifts, s);
   await setMeta('cardCounter', snap.cardCounter || 0);
+  await setMeta('staffList', snap.staffList || []);
 }
