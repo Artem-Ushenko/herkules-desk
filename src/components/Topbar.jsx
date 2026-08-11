@@ -1,3 +1,6 @@
+import ArmedButton from './ArmedButton.jsx';
+import { closeCurrentShift } from '../shifts.js';
+
 const TABS = [
   { screen: 'desk', label: 'Стійка' },
   { screen: 'clients', label: 'Клієнти' },
@@ -7,6 +10,11 @@ const TABS = [
 ];
 
 export default function Topbar({ screen, backupStatus, shift }) {
+  const handleClose = async () => {
+    await closeCurrentShift('staff');
+    document.dispatchEvent(new CustomEvent('herkules:shift-changed'));
+  };
+
   return (
     <header className="topbar">
       <div className="brand">Геркулес</div>
@@ -17,13 +25,14 @@ export default function Topbar({ screen, backupStatus, shift }) {
           </a>
         ))}
       </nav>
-      <a
-        className={'backup-status' + (shift ? '' : ' stale')}
-        href="#settings"
-        title="Відкрити/закрити зміну — Налаштування"
-      >
-        {shift ? `Зміна: ${shift.staff} з ${new Date(shift.openedAt).toLocaleTimeString('uk', { hour: '2-digit', minute: '2-digit' })}` : 'Зміна не відкрита'}
-      </a>
+      {shift && (
+        <div className="shift-status">
+          <span className="backup-status">
+            👤 {shift.staff} з {new Date(shift.openedAt).toLocaleTimeString('uk', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+          <ArmedButton label="Закрити зміну" confirmLabel="Точно закрити?" onConfirm={handleClose} />
+        </div>
+      )}
       <div className={'backup-status' + (backupStatus?.stale ? ' stale' : '')} title="Стан останнього бекапу">
         {backupStatus?.text || 'Копія: —'}
       </div>

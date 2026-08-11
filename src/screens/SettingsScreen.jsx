@@ -146,8 +146,8 @@ function ShiftBox() {
     <div className="box">
       <h2>Зміна</h2>
       <p className="muted">
-        Хто чергував на стійці, скільки візитів і оплат відбулось — облік/звітність,
-        не впливає на допуск за карткою. Готівка й каса — окремо, в «Геркулес Шоп».
+        Хто чергував на стійці, скільки візитів і оплат відбулось — відкриття/закриття
+        також відкриває/закриває допуск за карткою. Готівка й каса — окремо, в «Геркулес Шоп».
       </p>
 
       {shift ? (
@@ -158,7 +158,6 @@ function ShiftBox() {
           <ArmedButton
             label="Закрити зміну"
             confirmLabel="Точно закрити?"
-            className="btn-primary"
             onConfirm={handleClose}
           />
         </>
@@ -166,7 +165,7 @@ function ShiftBox() {
         <>
           <div className="inline-form wrap">
             {staffList.map((name) => (
-              <button key={name} type="button" disabled={busy} onClick={() => handleOpen(name)}>
+              <button key={name} type="button" className="btn-success" disabled={busy} onClick={() => handleOpen(name)}>
                 👤 {name}
               </button>
             ))}

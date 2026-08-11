@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Topbar from './components/Topbar.jsx';
+import ShiftGate from './components/ShiftGate.jsx';
 import DeskScreen from './screens/DeskScreen.jsx';
 import ClientsScreen from './screens/ClientsScreen.jsx';
 import SalesScreen from './screens/SalesScreen.jsx';
@@ -24,7 +25,7 @@ export default function App() {
   const [route, setRoute] = useState(parseHash());
   const [, setTick] = useState(0); // форсує перерахунок «N днів тому» раз на хвилину
   const backupState = useBackupStatus();
-  const [shift, setShift] = useState(null);
+  const [shift, setShift] = useState(undefined); // undefined — ще не завантажено, null — зміна не відкрита
 
   useEffect(() => {
     const onHashChange = () => setRoute(parseHash());
@@ -57,7 +58,8 @@ export default function App() {
   // на скані — застосунок працює цілий день, адмін може весь час бути на
   // іншому екрані. Автозакриття = «закриття зміни» → одразу бекап (розділ 6).
   // Чергування (shifts.js) автозакривається за тим самим правилом, незалежно
-  // від візитів — це облік/звітність, не гейт (DeskScreen працює завжди).
+  // від візитів. Закриття зміни (авто чи явне) знову показує ShiftGate —
+  // хтось має явно відкрити нову зміну, перш ніж стійка запрацює далі.
   useEffect(() => {
     async function runAutoClose() {
       const closedVisits = await autoCloseStaleVisits();
@@ -76,6 +78,12 @@ export default function App() {
   // в build/preview — у dev-режимі PWA вимкнено, це нормально.
 
   const backupStatus = backupState ? formatStatus(backupState) : null;
+
+  // Гейт зміни: поки не завантажили стан з БД — нічого не показуємо (уникає
+  // блимання гейтом на мить); поки зміну не відкрито явно — лише ShiftGate,
+  // решта екранів (зокрема стійка) недоступні.
+  if (shift === undefined) return null;
+  if (!shift) return <ShiftGate />;
 
   return (
     <>
