@@ -45,6 +45,30 @@ export async function initBackup() {
   state.permissionOk = perm === 'granted';
   emit();
   if (state.permissionOk) startSchedule();
+  bindAutoReconfirm();
+}
+
+// Chrome скидає дозвіл readwrite на збережений FileSystemDirectoryHandle при
+// кожному новому запуску браузера (кіоск перезапускає --app щодня) —
+// queryPermission() одразу після старту повертає не 'granted', навіть якщо
+// дозвіл уже надавали раніше. requestPermission() у відповідь на той самий
+// дозвіл зазвичай не показує діалог повторно (Chrome тихо підтверджує вже
+// наданий сайту дозвіл) — але вимагає жесту користувача, тож ловимо кожен
+// клік будь-де в застосунку (відкриття зміни на гейті теж підходить) і, поки
+// дозволу нема, тихо перевіряємо — без походу в Налаштування. Слухач лишається
+// на весь час роботи (не once): диск може відпасти й відновитись і посеред дня.
+let lastAutoReconfirmAt = 0;
+let autoReconfirmBound = false;
+function bindAutoReconfirm() {
+  if (autoReconfirmBound) return;
+  autoReconfirmBound = true;
+  document.addEventListener('click', async () => {
+    if (state.permissionOk || !dirHandle) return;
+    const now = Date.now();
+    if (now - lastAutoReconfirmAt < 30000) return;
+    lastAutoReconfirmAt = now;
+    await reconfirmPermission();
+  });
 }
 
 // ── Вибір / перевидача папки (потребує жесту користувача — виклик з onclick) ──
