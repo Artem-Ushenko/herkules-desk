@@ -3,7 +3,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { CONFIG } from '../config.js';
-import { STORES, get, put } from '../db.js';
+import { STORES, get, put, getMeta, setMeta } from '../db.js';
 import { evaluateAccess } from '../access.js';
 import { checkIn, checkOut, cancelCheckIn, findOpenVisit, listOpenVisits, withinUndoWindow } from '../visits.js';
 
@@ -58,6 +58,15 @@ function UnknownCardForm({ code, onCreated }) {
       subscription: null
     };
     await put(STORES.clients, client);
+    // Якщо відскановано картку у форматі авто-номера (HC####), підняти
+    // лічильник, щоб nextCardId() пізніше не згенерував той самий номер
+    // і тихо не перезаписав цього клієнта (див. herkules-cardid-collision-bug).
+    const m = new RegExp(`^${CONFIG.CARD_PREFIX}(\\d+)$`).exec(code);
+    if (m) {
+      const n = parseInt(m[1], 10);
+      const cur = await getMeta('cardCounter', 0);
+      if (n > cur) await setMeta('cardCounter', n);
+    }
     onCreated(client);
   };
 
