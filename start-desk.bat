@@ -20,11 +20,11 @@ REM -----------------------------------------------------------
 set "APP_DIR=%~dp0"
 set "CRM_URL=http://localhost:%PORT%/"
 
-REM Позиція й розмір вікна — за замовчуванням на весь перший монітор.
+REM Позиція вікна — на весь перший монітор. Розмір не фіксуємо пікселями
+REM (--start-maximized нижче): на іншому дозволі екрана фіксовані WIN_W/WIN_H
+REM лишали б поля або обрізали вікно.
 set "WIN_X=0"
 set "WIN_Y=0"
-set "WIN_W=1900"
-set "WIN_H=1040"
 
 echo.
 echo   ГЕРКУЛЕС КЛУБ — підготовка робочого місця
@@ -90,7 +90,7 @@ start "CRM" /ABOVENORMAL "%CHROME%" ^
   --user-data-dir="%PROFILES%\crm" ^
   --app="%CRM_URL%" ^
   --window-position=%WIN_X%,%WIN_Y% ^
-  --window-size=%WIN_W%,%WIN_H% ^
+  --start-maximized ^
   --disable-background-timer-throttling ^
   --disable-backgrounding-occluded-windows ^
   --disable-renderer-backgrounding ^
