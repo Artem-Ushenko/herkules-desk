@@ -300,17 +300,75 @@ button:hover, .btn:hover { border-color: var(--accent); }
 
 .shift-gate-card {
   background: var(--surface);
-  border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow);
   padding: 2rem;
-  max-width: 480px;
+  max-width: 420px;
   width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   text-align: center;
 }
 
-.shift-gate-card h1 { margin-top: 0; font-size: 1.4rem; }
-.shift-gate-card .inline-form { justify-content: center; margin-top: 1.25rem; }
+/* Фірмовий заголовок і підпис — той самий стиль і текст, що й у
+   OpenShiftScreen.jsx сестринського проєкту (Геркулес Шоп,
+   mini_shop_POS/src/index.css), щоб екран входу «хто відкриває зміну»
+   виглядав і читався однаково в обох застосунках. */
+.shift-gate-card .gate-brand { font-size: 1.2rem; font-weight: 800; letter-spacing: .06em; color: var(--accent); }
+.shift-gate-card .setup-subtitle {
+  font-size: .8rem; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .06em;
+  margin-top: 8px; text-align: left;
+}
+.shift-gate-card .inline-form { justify-content: center; }
+.shift-gate-card button.small {
+  align-self: center;
+  border: none;
+  background: none;
+  color: var(--muted);
+}
+.shift-gate-card button.small:hover { color: var(--accent); }
+
+/* ── Список вибору співробітника — той самий вигляд, що .cashier-pick-list/
+   .cashier-pick-btn у Геркулес Шоп ── */
+.staff-pick-list { display: flex; flex-direction: column; gap: 10px; }
+.staff-pick-btn {
+  min-height: 60px; font-size: 1.15rem; font-weight: 600;
+  border: 2px solid var(--border); border-radius: var(--radius);
+  background: var(--surface);
+}
+.staff-pick-btn:hover:not(:disabled) {
+  border-color: var(--accent); background: #eff6ff; color: var(--accent);
+}
+.staff-pick-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Модалка підтвердження відкриття зміни — той самий вигляд, що
+   .modal-overlay/.modal-card у Геркулес Шоп ── */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+.modal-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 1.5rem;
+  width: 100%; max-width: 380px;
+  display: flex; flex-direction: column; gap: 14px;
+  text-align: left;
+}
+.modal-card h2 { font-size: 1.1rem; margin: 0; }
+
+.shift-summary { list-style: none; display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; }
+.shift-summary li {
+  display: flex; justify-content: space-between;
+  padding-bottom: 8px; border-bottom: 1px solid var(--border);
+}
+.shift-summary li span { color: var(--muted); }
+
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
 
 .sub-info { padding: .6rem .8rem; border-radius: var(--radius); background: var(--bg); margin-bottom: .6rem; }
 .sub-info.status-ok { background: var(--ok-bg); }
