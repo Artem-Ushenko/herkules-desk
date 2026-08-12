@@ -205,7 +205,7 @@ function ClientCard({ id }) {
   }
 
   if (editing) {
-    return <ClientForm client={client} onDone={() => { setEditing(false); load(); }} />;
+    return <ClientForm client={client} onDone={() => { setEditing(false); load(); }} onBack={() => setEditing(false)} />;
   }
 
   const s = client.subscription;
@@ -367,7 +367,7 @@ function ClientCard({ id }) {
   );
 }
 
-function ClientForm({ client, presetId = '', onDone }) {
+function ClientForm({ client, presetId = '', onDone, onBack }) {
   const isNew = !client;
   const c = client || {
     id: presetId, type: 'member', name: '', phone: '', birthday: '', isVeteran: false,
@@ -424,7 +424,11 @@ function ClientForm({ client, presetId = '', onDone }) {
   return (
     <>
       <div className="card-head">
-        <a href={isNew ? '#clients' : '#clients/' + c.id} className="btn">← Назад</a>
+        {onBack ? (
+          <button type="button" className="btn" onClick={onBack}>← Назад</button>
+        ) : (
+          <a href={isNew ? '#clients' : '#clients/' + c.id} className="btn">← Назад</a>
+        )}
         <h1>{isNew ? 'Новий клієнт' : 'Редагування: ' + c.name}</h1>
       </div>
       {error && <div className="banner warn-banner">{error}</div>}
