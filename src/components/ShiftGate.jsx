@@ -7,7 +7,7 @@
 // перенесені — для клубу сенсу не мають.
 
 import { useEffect, useState } from 'react';
-import { getStaffList, addStaffName, openShift } from '../shifts.js';
+import { getStaffList, addStaffName, renameStaffName, removeStaffName, openShift } from '../shifts.js';
 
 export default function ShiftGate() {
   const [staffList, setStaffList] = useState([]);
@@ -16,6 +16,9 @@ export default function ShiftGate() {
   const [confirmingStaff, setConfirmingStaff] = useState(null);
   const [opening, setOpening] = useState(false);
   const [error, setError] = useState(null);
+  const [editingStaff, setEditingStaff] = useState(null);
+  const [editStaffName, setEditStaffName] = useState('');
+  const [confirmingDelete, setConfirmingDelete] = useState(null);
 
   useEffect(() => { getStaffList().then(setStaffList); }, []);
 
@@ -53,6 +56,28 @@ export default function ShiftGate() {
     }
   }
 
+  async function handleRename(oldName) {
+    setError(null);
+    try {
+      const updated = await renameStaffName(oldName, editStaffName);
+      setStaffList(updated);
+      setEditingStaff(null);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function handleDelete(name) {
+    setError(null);
+    try {
+      const updated = await removeStaffName(name);
+      setStaffList(updated);
+      setConfirmingDelete(null);
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
   return (
     <div className="shift-gate">
       <div className="shift-gate-card">
@@ -61,15 +86,57 @@ export default function ShiftGate() {
         <h2 className="setup-subtitle">Хто відкриває зміну?</h2>
         <div className="staff-pick-list">
           {staffList.map((name) => (
-            <button
-              key={name}
-              type="button"
-              className="staff-pick-btn"
-              disabled={opening}
-              onClick={() => setConfirmingStaff(name)}
-            >
-              👤 {name}
-            </button>
+            <div key={name} className="staff-pick-row">
+              {editingStaff === name ? (
+                <div className="manage-edit-form">
+                  <div className="manage-form-row">
+                    <input
+                      type="text"
+                      autoFocus
+                      value={editStaffName}
+                      onChange={(e) => setEditStaffName(e.target.value)}
+                    />
+                  </div>
+                  <div className="manage-edit-actions">
+                    <button type="button" className="btn-primary" disabled={!editStaffName.trim()} onClick={() => handleRename(name)}>
+                      Зберегти
+                    </button>
+                    <button type="button" onClick={() => setEditingStaff(null)}>Скасувати</button>
+                  </div>
+                </div>
+              ) : confirmingDelete === name ? (
+                <div className="cancel-confirm">
+                  <span>Видалити «{name}»?</span>
+                  <button type="button" className="btn-danger" style={{ minHeight: 36, padding: '6px 14px' }} onClick={() => handleDelete(name)}>
+                    Так
+                  </button>
+                  <button type="button" onClick={() => setConfirmingDelete(null)}>Ні</button>
+                </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="staff-pick-btn"
+                    disabled={opening}
+                    onClick={() => setConfirmingStaff(name)}
+                  >
+                    👤 {name}
+                  </button>
+                  <button
+                    type="button"
+                    className="staff-row-icon-btn"
+                    title="Перейменувати"
+                    onClick={() => { setEditingStaff(name); setEditStaffName(name); }}
+                  >✏️</button>
+                  <button
+                    type="button"
+                    className="staff-row-icon-btn danger"
+                    title="Видалити"
+                    onClick={() => setConfirmingDelete(name)}
+                  >✕</button>
+                </>
+              )}
+            </div>
           ))}
         </div>
 

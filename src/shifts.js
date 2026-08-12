@@ -29,6 +29,23 @@ export async function addStaffName(name) {
   return updated;
 }
 
+export async function renameStaffName(oldName, newName) {
+  const trimmed = (newName ?? '').trim();
+  if (!trimmed) throw new Error('Вкажіть ім\'я');
+  const list = await getStaffList();
+  if (trimmed !== oldName && list.includes(trimmed)) throw new Error('Такий співробітник вже є');
+  const updated = list.map((n) => (n === oldName ? trimmed : n));
+  await setMeta('staffList', updated);
+  return updated;
+}
+
+export async function removeStaffName(name) {
+  const list = await getStaffList();
+  const updated = list.filter((n) => n !== name);
+  await setMeta('staffList', updated);
+  return updated;
+}
+
 // Підсумок зміни: візити й оплати, прив'язані до неї за shiftId (currentShiftId()
 // у visits.js/subscriptions.js виставляє це поле в момент створення запису).
 async function summarize(shift) {

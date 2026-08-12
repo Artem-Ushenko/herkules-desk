@@ -333,6 +333,8 @@ button:hover, .btn:hover { border-color: var(--accent); }
 /* ── Список вибору співробітника — той самий вигляд, що .cashier-pick-list/
    .cashier-pick-btn у Геркулес Шоп ── */
 .staff-pick-list { display: flex; flex-direction: column; gap: 10px; }
+.staff-pick-row { display: flex; gap: 6px; }
+.staff-pick-row .staff-pick-btn { flex: 1; }
 .staff-pick-btn {
   min-height: 60px; font-size: 1.15rem; font-weight: 600;
   border: 2px solid var(--border); border-radius: var(--radius);
@@ -342,6 +344,27 @@ button:hover, .btn:hover { border-color: var(--accent); }
   border-color: var(--accent); background: #eff6ff; color: var(--accent);
 }
 .staff-pick-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.staff-row-icon-btn {
+  flex-shrink: 0; min-width: 48px;
+  border: 2px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); font-size: 1.05rem;
+}
+.staff-row-icon-btn:hover { border-color: var(--accent); background: #eff6ff; }
+.staff-row-icon-btn.danger:hover { border-color: var(--deny); background: var(--deny-bg); }
+
+/* ── Inline-редагування/видалення в списках (той самий патерн, що
+   .manage-edit-form/.cancel-confirm у Геркулес Шоп) ── */
+.manage-edit-form { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+.manage-edit-actions { display: flex; gap: 10px; }
+.manage-form-row { display: flex; }
+.manage-form-row input {
+  flex: 1; height: 44px; padding: 0 12px; border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm); font-size: 0.95rem; background: var(--surface);
+}
+.manage-form-row input:focus { border-color: var(--accent); outline: none; }
+
+.cancel-confirm { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; color: var(--deny); }
 
 /* ── Модалка підтвердження відкриття зміни — той самий вигляд, що
    .modal-overlay/.modal-card у Геркулес Шоп ── */
