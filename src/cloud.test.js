@@ -20,6 +20,11 @@ const closedShift = {
 };
 
 describe('formatShiftCloseReport', () => {
+  it('починається з чіткої мітки клубу, відокремленої від решти звіту', () => {
+    const text = formatShiftCloseReport(closedShift);
+    expect(text.startsWith('🏋️ <b>ГЕРКУЛЕС КЛУБ</b>\n')).toBe(true);
+  });
+
   it('явне закриття — без позначки "автоматично", ✅', () => {
     const text = formatShiftCloseReport(closedShift);
     expect(text).toContain('✅');

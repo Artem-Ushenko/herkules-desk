@@ -29,10 +29,14 @@ function money(n) {
   return `${Math.round(Number(n) || 0).toLocaleString('uk-UA')} ₴`;
 }
 
+// Заголовок з назвою клубу на окремому рядку відокремлює звіт від звітів
+// сестринського проєкту (Геркулес Шоп, mini_shop_POS), що йдуть у той самий
+// Telegram-чат власника.
 export function formatShiftCloseReport(shift) {
   const bySystem = shift.closedBy === 'system';
   const lines = [
-    `${bySystem ? '🔴' : '✅'} <b>${esc(CONFIG.CLUB_NAME)}</b> — зміну закрито о ${fmtTime(shift.closedAt)}` +
+    `🏋️ <b>${esc(CONFIG.CLUB_NAME.toUpperCase())}</b>`,
+    `${bySystem ? '🔴' : '✅'} Зміну закрито о ${fmtTime(shift.closedAt)}` +
       (bySystem ? ' <b>автоматично системою</b> (не закрили вручну)' : ''),
     `👤 ${esc(shift.staff)} · відкрито о ${fmtTime(shift.openedAt)}`,
     `🚪 Візитів: ${shift.visitCount}`,
