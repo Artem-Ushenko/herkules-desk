@@ -176,7 +176,7 @@ button:hover, .btn:hover { border-color: var(--accent); }
 
 .toolbar .spacer { flex: 1; }
 
-.search, select, input[type="text"], input[type="tel"], input[type="date"], input[type="number"], textarea {
+.search, select, input[type="text"], input[type="tel"], input[type="date"], input[type="number"], input[type="password"], textarea {
   font: inherit;
   padding: .5rem .7rem;
   border: 1px solid var(--border);

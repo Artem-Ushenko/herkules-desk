@@ -9,6 +9,7 @@
 
 import { CONFIG } from './config.js';
 import { STORES, getAll, getAllByIndex, put, getMeta, setMeta } from './db.js';
+import { trySendReport, formatShiftCloseReport } from './cloud.js';
 
 export async function getCurrentShift() {
   const all = await getAll(STORES.shifts);
@@ -68,6 +69,10 @@ async function closeRecord(shift, closedBy) {
   const stats = await summarize(shift);
   const closed = { ...shift, closedAt: Date.now(), closedBy, ...stats };
   await put(STORES.shifts, closed);
+  // Звіт у Telegram (cloud.js) — best effort, не чекаємо і не блокуємо закриття
+  // зміни. Єдина точка виклику охоплює всі шляхи закриття: явне, автозакриття
+  // о CLOSE_TIME і автозакриття забутої зміни при відкритті нової.
+  trySendReport(formatShiftCloseReport(closed));
   return closed;
 }
 

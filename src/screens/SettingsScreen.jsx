@@ -15,6 +15,7 @@ import {
   getCurrentShift, getStaffList, addStaffName,
   openShift, closeCurrentShift, getRecentClosedShifts
 } from '../shifts.js';
+import { getCloudReportConfig, setCloudReportConfig, trySendReport } from '../cloud.js';
 
 function TariffsBox() {
   const [tariffs, setTariffs] = useState([]);
@@ -214,6 +215,62 @@ function ShiftBox() {
   );
 }
 
+// Звіт закриття зміни в Telegram (cloud.js) через проксі Apps Script — той самий
+// скрипт, що вже приймає звіти від сестринського проєкту (Геркулес Шоп,
+// mini_shop_POS/gerkules-snapshot-proxy.gs). URL/токен беруться з деплою
+// скрипта (Deploy → Web app → /exec) і зберігаються в meta-сторі пристрою.
+function CloudReportBox() {
+  const [url, setUrl] = useState('');
+  const [token, setToken] = useState('');
+  const [saved, setSaved] = useState(false);
+  const [testResult, setTestResult] = useState(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    getCloudReportConfig().then((cfg) => { setUrl(cfg.url || ''); setToken(cfg.token || ''); });
+  }, []);
+
+  const save = async (e) => {
+    e.preventDefault();
+    await setCloudReportConfig({ url: url.trim(), token: token.trim() });
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  };
+
+  const sendTest = async () => {
+    setBusy(true);
+    setTestResult(null);
+    await setCloudReportConfig({ url: url.trim(), token: token.trim() });
+    const r = await trySendReport('🤖 Геркулес Клуб: тестове повідомлення з Налаштувань');
+    setTestResult(r);
+    setBusy(false);
+  };
+
+  return (
+    <div className="box">
+      <h2>Хмарні звіти (Telegram)</h2>
+      <p className="muted">
+        При закритті зміни (вручну чи автоматично) короткий звіт летить у Telegram
+        через проксі-скрипт Apps Script — той самий, що в «Геркулес Шоп».
+      </p>
+      <form className="inline-form wrap" onSubmit={save}>
+        <input type="text" placeholder="URL проксі (…/exec)" style={{ minWidth: 320 }} value={url} onChange={(e) => setUrl(e.target.value)} />
+        <input type="text" placeholder="Токен (SECRET_TOKEN)" value={token} onChange={(e) => setToken(e.target.value)} />
+        <button type="submit" className="btn-primary">Зберегти</button>
+        <button type="button" disabled={!url.trim() || !token.trim() || busy} onClick={sendTest}>
+          {busy ? 'Надсилаємо…' : 'Надіслати тест'}
+        </button>
+      </form>
+      {saved && <p className="status-ok">Збережено</p>}
+      {testResult && (
+        <p className={testResult.ok ? 'status-ok' : 'status-deny'}>
+          {testResult.ok ? '✓ Надіслано в Telegram' : `✗ ${testResult.error}`}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function BackupBox() {
   const s = useBackupStatus();
   const [alerts, setAlerts] = useState([]);
@@ -303,6 +360,7 @@ export default function SettingsScreen() {
     <>
       <TariffsBox />
       <ShiftBox />
+      <CloudReportBox />
       <BackupBox />
     </>
   );

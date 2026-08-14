@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Topbar from './components/Topbar.jsx';
 import ShiftGate from './components/ShiftGate.jsx';
+import PasswordGate from './components/PasswordGate.jsx';
 import DeskScreen from './screens/DeskScreen.jsx';
 import ClientsScreen from './screens/ClientsScreen.jsx';
 import SalesScreen from './screens/SalesScreen.jsx';
@@ -11,9 +12,17 @@ import SettingsScreen from './screens/SettingsScreen.jsx';
 import { initBackup, bindUnloadBackup, writeBackup, formatStatus } from './backup.js';
 import { autoCloseStaleVisits } from './visits.js';
 import { getCurrentShift, autoCloseStaleShift } from './shifts.js';
+import { retryPendingReports } from './cloud.js';
 import { useBackupStatus } from './hooks/useBackupStatus.js';
 
 const SCREEN_NAMES = ['desk', 'clients', 'sales', 'journal', 'settings'];
+
+// «Налаштування» — чутливий екран (тарифи, зміни, відновлення бази з файлу):
+// вхід питає пароль адміністратора щоразу заново, без запам'ятовування
+// розблокування. У бандл потрапляє лише SHA-256-хеш (.env.example). Локальна
+// розробка без .env пароль не питає — той самий принцип, що в сестринському
+// проєкті (Геркулес Шоп, mini_shop_POS/src/App.jsx).
+const ADMIN_PASSWORD_HASH = import.meta.env.VITE_ADMIN_PASSWORD_SHA256;
 
 function parseHash() {
   const [name, ...rest] = location.hash.slice(1).split('/');
@@ -26,11 +35,26 @@ export default function App() {
   const [, setTick] = useState(0); // форсує перерахунок «N днів тому» раз на хвилину
   const backupState = useBackupStatus();
   const [shift, setShift] = useState(undefined); // undefined — ще не завантажено, null — зміна не відкрита
+  const [settingsUnlocked, setSettingsUnlocked] = useState(false);
 
   useEffect(() => {
     const onHashChange = () => setRoute(parseHash());
     window.addEventListener('hashchange', onHashChange);
     return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
+
+  // Вихід з «Налаштувань» на будь-який інший екран скидає розблокування —
+  // повернення туди знову питає пароль.
+  useEffect(() => {
+    if (route.screen !== 'settings') setSettingsUnlocked(false);
+  }, [route.screen]);
+
+  // Відкладені Telegram-звіти закриття зміни (cloud.js): досилаємо на старті
+  // й при появі мережі, той самий принцип, що для бекапів/снапшотів у Шопі.
+  useEffect(() => {
+    retryPendingReports();
+    window.addEventListener('online', retryPendingReports);
+    return () => window.removeEventListener('online', retryPendingReports);
   }, []);
 
   // Індикатор бекапу в шапці: проблема має бути видна одразу (розділ 6);
@@ -93,7 +117,17 @@ export default function App() {
         {route.screen === 'clients' && <ClientsScreen param={route.param} />}
         {route.screen === 'sales' && <SalesScreen />}
         {route.screen === 'journal' && <JournalScreen />}
-        {route.screen === 'settings' && <SettingsScreen />}
+        {route.screen === 'settings' && (
+          ADMIN_PASSWORD_HASH && !settingsUnlocked ? (
+            <PasswordGate
+              correctHash={ADMIN_PASSWORD_HASH}
+              onUnlock={() => setSettingsUnlocked(true)}
+              onBack={() => { location.hash = '#desk'; }}
+            />
+          ) : (
+            <SettingsScreen />
+          )
+        )}
       </main>
     </>
   );
