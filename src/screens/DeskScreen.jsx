@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CONFIG } from '../config.js';
 import { STORES, get, put, getMeta, setMeta } from '../db.js';
 import { evaluateAccess } from '../access.js';
-import { checkIn, checkOut, cancelCheckIn, findOpenVisit, listOpenVisits, withinUndoWindow } from '../visits.js';
+import { checkIn, checkOut, cancelCheckIn, findOpenVisit, listOpenVisits, withinUndoWindow, reopenVisit, withinCheckOutUndoWindow } from '../visits.js';
 
 const TYPE_LABELS = { member: 'Клієнт', guest: 'Гість орендаря', trainer: 'Тренер' };
 
@@ -32,6 +32,27 @@ function UndoButton({ lastCheckIn, onDone }) {
   return (
     <button type="button" className={armedAdmin ? 'btn-danger' : ''} onClick={handleClick}>
       {armedAdmin ? `Минуло понад ${CONFIG.UNDO_WINDOW_MIN} хв — натисніть ще раз (дія залогується)` : 'Скасувати вхід'}
+    </button>
+  );
+}
+
+function UndoCheckoutButton({ lastCheckOut, onDone }) {
+  const [armedAdmin, setArmedAdmin] = useState(false);
+
+  const handleClick = async () => {
+    if (!lastCheckOut) return;
+    const inWindow = withinCheckOutUndoWindow(lastCheckOut.visit);
+    if (!inWindow && !armedAdmin) {
+      setArmedAdmin(true);
+      return;
+    }
+    await reopenVisit(lastCheckOut.visit, { adminOverride: !inWindow });
+    onDone(lastCheckOut.clientName);
+  };
+
+  return (
+    <button type="button" className={armedAdmin ? 'btn-danger' : ''} onClick={handleClick}>
+      {armedAdmin ? `Минуло понад ${CONFIG.UNDO_WINDOW_MIN} хв — натисніть ще раз (дія залогується)` : 'Повернути візит (клієнт ще в залі)'}
     </button>
   );
 }
@@ -89,6 +110,7 @@ export default function DeskScreen() {
   const [inGym, setInGym] = useState([]);
   const [now, setNow] = useState(Date.now());
   const lastCheckInRef = useRef(null);
+  const lastCheckOutRef = useRef(null);
   const scanRef = useRef(null);
   const [scanValue, setScanValue] = useState('');
 
@@ -145,8 +167,9 @@ export default function DeskScreen() {
     const open = await findOpenVisit(client.id);
     if (open) {
       const v = await checkOut(open);
+      lastCheckOutRef.current = { visit: v, clientName: client.name };
       await refreshInGym();
-      setVerdict({ kind: 'ok', title: 'ДО ПОБАЧЕННЯ', sub: `${client.name} · у залі ${formatDuration(v.checkOut - v.checkIn)}` });
+      setVerdict({ kind: 'ok', title: 'ДО ПОБАЧЕННЯ', sub: `${client.name} · у залі ${formatDuration(v.checkOut - v.checkIn)}`, showUndoCheckout: true });
       return;
     }
 
@@ -183,6 +206,13 @@ export default function DeskScreen() {
     focusScan();
   };
 
+  const onUndoCheckoutDone = async (clientName) => {
+    setVerdict({ kind: 'ok', title: 'ВІЗИТ ПОВЕРНУТО', sub: `${clientName} · клієнт лишається в залі` });
+    lastCheckOutRef.current = null;
+    await refreshInGym();
+    focusScan();
+  };
+
   const onClientCreated = (client) => {
     setVerdict({ kind: 'warn', title: 'СТВОРЕНО', sub: `${client.name} · без абонемента`, sellClientId: client.id });
     focusScan();
@@ -204,6 +234,11 @@ export default function DeskScreen() {
         {verdict.showUndo && (
           <div className="v-actions">
             <UndoButton lastCheckIn={lastCheckInRef.current} onDone={onUndoDone} />
+          </div>
+        )}
+        {verdict.showUndoCheckout && (
+          <div className="v-actions">
+            <UndoCheckoutButton lastCheckOut={lastCheckOutRef.current} onDone={onUndoCheckoutDone} />
           </div>
         )}
         {verdict.unknownCode && <UnknownCardForm code={verdict.unknownCode} onCreated={onClientCreated} />}

@@ -1,4 +1,4 @@
-// Життєвий цикл візиту: вхід, вихід, скасування входу.
+// Життєвий цикл візиту: вхід, вихід, скасування входу, повернення візиту.
 // Візит списується на вході (правило 3.2) — люди йдуть не відмічаючись.
 
 import { CONFIG } from './config.js';
@@ -50,6 +50,11 @@ export function withinUndoWindow(visit, now = Date.now()) {
   return now - visit.checkIn <= CONFIG.UNDO_WINDOW_MIN * 60000;
 }
 
+// Чи ще діє вікно «Повернути візит» без режиму адміністратора
+export function withinCheckOutUndoWindow(visit, now = Date.now()) {
+  return visit.checkOut !== null && now - visit.checkOut <= CONFIG.UNDO_WINDOW_MIN * 60000;
+}
+
 // Скасування входу: візит видаляється (не сторнується — він ще «не відбувся»),
 // списаний візит повертається на баланс. Після вікна — тільки з логуванням.
 export async function cancelCheckIn(visit, { adminOverride = false } = {}) {
@@ -65,6 +70,23 @@ export async function cancelCheckIn(visit, { adminOverride = false } = {}) {
   if (adminOverride) {
     await logAdminAction('cancel-visit', { visitId: visit.id, clientId: visit.clientId, checkIn: visit.checkIn });
   }
+}
+
+// Повернення візиту: скасовує помилковий вихід (картку зі входу випадково
+// відсканували ще раз) — клієнт фізично лишався в залі. Баланс відвідувань
+// не чіпаємо: він списується на вході, а не на виході.
+export async function reopenVisit(visit, { adminOverride = false } = {}) {
+  if (!withinCheckOutUndoWindow(visit) && !adminOverride) {
+    throw new Error('Вікно скасування минуло — потрібен режим адміністратора');
+  }
+  const prevCheckOut = visit.checkOut;
+  visit.checkOut = null;
+  visit.open = 1;
+  await put(STORES.visits, visit);
+  if (adminOverride) {
+    await logAdminAction('reopen-visit', { visitId: visit.id, clientId: visit.clientId, checkOut: prevCheckOut });
+  }
+  return visit;
 }
 
 // Журнал дій адміністратора поза звичайним потоком (вимога 3.2)
