@@ -1,6 +1,7 @@
-// Екран «Продажі»: оплати за період, номер фіскального чека, сторно, CSV.
+// Екран «Продажі»: оплати за період, сторно, CSV.
 // Історичні записи не редагуються (розділ 2): виправлення — сторнуючим
-// записом; вручну дозаповнюється лише номер чека Checkbox.
+// записом; вручну дозаповнюється лише спосіб оплати (готівка/картка) —
+// на практиці касир іноді натискає не той варіант.
 
 import { useEffect, useState } from 'react';
 import { STORES, getAll, put } from '../db.js';
@@ -14,18 +15,18 @@ function defaultFrom() {
   return toISODate(new Date(now.getFullYear(), now.getMonth(), 1));
 }
 
-function FiscalCell({ payment, onSaved }) {
-  const [value, setValue] = useState('');
-  if (payment.fiscalReceiptNo) return payment.fiscalReceiptNo;
+function MethodCell({ payment, onSaved }) {
   return (
-    <span className="inline-form">
-      <input className="fiscal-input" placeholder="№ чека" value={value} onChange={(e) => setValue(e.target.value)} />
-      <button type="button" className="small" onClick={async () => {
-        if (!value.trim()) return;
-        await put(STORES.payments, { ...payment, fiscalReceiptNo: value.trim() });
+    <select
+      value={payment.method}
+      onChange={async (e) => {
+        await put(STORES.payments, { ...payment, method: e.target.value });
         onSaved();
-      }}>✓</button>
-    </span>
+      }}
+    >
+      <option value="cash">готівка</option>
+      <option value="card">картка</option>
+    </select>
   );
 }
 
@@ -57,8 +58,24 @@ export default function SalesScreen() {
       method: p.method,
       item: p.item,
       tariffId: p.tariffId,
-      fiscalReceiptNo: '',
       note: 'сторно ' + p.id.slice(0, 8),
+      shiftId: await currentShiftId()
+    });
+    load();
+  };
+
+  // Скасування сторно: ще один компенсуючий запис, що повертає суму назад —
+  // сам запис сторно (розділ 2: історичні записи не редагуються) не чіпається.
+  const undoStorno = async (p) => {
+    await put(STORES.payments, {
+      id: crypto.randomUUID(),
+      clientId: p.clientId,
+      date: new Date().toISOString(),
+      amount: -p.amount,
+      method: p.method,
+      item: p.item,
+      tariffId: p.tariffId,
+      note: 'скасування сторно ' + p.id.slice(0, 8),
       shiftId: await currentShiftId()
     });
     load();
@@ -72,15 +89,15 @@ export default function SalesScreen() {
         <span className="spacer" />
         <b>Разом: {fmtMoney(total)}</b>
         <button type="button" onClick={() => downloadCSV(`продажі-${from}-${to}.csv`, [
-          ['Дата', 'Клієнт', 'Позиція', 'Сума', 'Спосіб', '№ чека', 'Нотатка'],
+          ['Дата', 'Клієнт', 'Позиція', 'Сума', 'Спосіб', 'Нотатка'],
           ...visible.map((p) => [fmtDateTime(p.date), names.get(p.clientId) || p.clientId, p.item,
-            p.amount, p.method === 'cash' ? 'готівка' : 'картка', p.fiscalReceiptNo || '', p.note || ''])
+            p.amount, p.method === 'cash' ? 'готівка' : 'картка', p.note || ''])
         ])}>Експорт CSV</button>
       </div>
 
       <table className="data-table">
         <thead>
-          <tr>{['Дата', 'Клієнт', 'Позиція', 'Сума', 'Спосіб', '№ фіск. чека', ''].map((t) => <th key={t}>{t}</th>)}</tr>
+          <tr>{['Дата', 'Клієнт', 'Позиція', 'Сума', 'Спосіб', ''].map((t) => <th key={t}>{t}</th>)}</tr>
         </thead>
         <tbody>
           {visible.map((p) => (
@@ -89,11 +106,15 @@ export default function SalesScreen() {
               <td><a href={'#clients/' + p.clientId}>{names.get(p.clientId) || p.clientId}</a></td>
               <td>{p.item}{p.note ? ` (${p.note})` : ''}</td>
               <td className={p.amount < 0 ? 'status-deny' : ''}>{fmtMoney(p.amount)}</td>
-              <td>{p.method === 'cash' ? 'готівка' : 'картка'}</td>
-              <td><FiscalCell payment={p} onSaved={load} /></td>
-              <td>{p.amount > 0 && !p.note.startsWith('сторно') && (
-                <ArmedButton label="Сторно" confirmLabel="Створити сторнуючий запис?" onConfirm={() => storno(p)} />
-              )}</td>
+              <td><MethodCell payment={p} onSaved={load} /></td>
+              <td>
+                {p.amount > 0 && !p.note.startsWith('сторно') && (
+                  <ArmedButton label="Скасувати оплату" confirmLabel="Скасувати цю оплату? Буде створено компенсуючий запис." onConfirm={() => storno(p)} />
+                )}
+                {p.amount < 0 && p.note.startsWith('сторно') && (
+                  <ArmedButton label="Скасувати сторно" confirmLabel="Скасувати це сторно? Оплату буде відновлено новим записом." onConfirm={() => undoStorno(p)} />
+                )}
+              </td>
             </tr>
           ))}
         </tbody>

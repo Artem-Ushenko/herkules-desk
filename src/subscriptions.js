@@ -17,7 +17,7 @@ export function daysBetween(aISO, bISO) {
 
 // Продаж: абонемент замінюється, оплата пишеться один раз і назавжди.
 // endDate = start + days - 1: тариф на 30 днів діє 30 календарних днів включно.
-export async function sellSubscription(client, tariff, { startDate, method, fiscalReceiptNo = '', note = '' }) {
+export async function sellSubscription(client, tariff, { startDate, method, note = '' }) {
   client.subscription = {
     tariffId: tariff.id,
     title: tariff.title,
@@ -36,7 +36,6 @@ export async function sellSubscription(client, tariff, { startDate, method, fisc
     method,
     item: tariff.title,
     tariffId: tariff.id,
-    fiscalReceiptNo,
     note,
     shiftId: await currentShiftId() // для звіту чергування (shifts.js) — не блокує продаж, якщо зміни нема
   };

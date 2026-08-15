@@ -167,7 +167,6 @@ function ClientCard({ id }) {
   const [tariffId, setTariffId] = useState('');
   const [method, setMethod] = useState('cash');
   const [startDate, setStartDate] = useState(toISODate(new Date()));
-  const [fiscalNo, setFiscalNo] = useState('');
   const [freezeReason, setFreezeReason] = useState('service');
 
   const flashMsg = (message, isError = false) => {
@@ -301,11 +300,10 @@ function ClientCard({ id }) {
                     <option value="card">Картка</option>
                   </select>
                   <label>Початок: <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
-                  <input type="text" placeholder="№ чека Checkbox (можна пізніше)" value={fiscalNo} onChange={(e) => setFiscalNo(e.target.value)} />
                   <button type="button" className="btn-primary" onClick={async () => {
                     const tariff = available.find((t) => t.id === (tariffId || available[0]?.id));
                     if (!tariff) return;
-                    await sellSubscription(client, tariff, { startDate, method, fiscalReceiptNo: fiscalNo.trim() });
+                    await sellSubscription(client, tariff, { startDate, method });
                     load();
                   }}>Продати</button>
                 </div>
