@@ -6,7 +6,7 @@ import { CONFIG } from '../config.js';
 import { STORES, get, getAll, getAllByIndex, put, remove, nextCardId } from '../db.js';
 import { evaluateAccess, formatDate, toISODate } from '../access.js';
 import { listOpenVisits } from '../visits.js';
-import { sellSubscription, freezeSubscription, unfreezeSubscription, FREEZE_REASONS } from '../subscriptions.js';
+import { sellSubscription, freezeSubscription, unfreezeSubscription, editSubscription, FREEZE_REASONS } from '../subscriptions.js';
 import { barcodeSVG } from '../barcode.js';
 import { qrSVG } from '../qr.js';
 import { fmtMoney, fmtDateTime, downloadCSV } from '../utils.js';
@@ -168,10 +168,39 @@ function ClientCard({ id }) {
   const [method, setMethod] = useState('cash');
   const [startDate, setStartDate] = useState(toISODate(new Date()));
   const [freezeReason, setFreezeReason] = useState('service');
+  const [editingSub, setEditingSub] = useState(false);
+  const [subTitle, setSubTitle] = useState('');
+  const [subStart, setSubStart] = useState('');
+  const [subEnd, setSubEnd] = useState('');
+  const [subVisitsTotal, setSubVisitsTotal] = useState('');
+  const [subVisitsLeft, setSubVisitsLeft] = useState('');
 
   const flashMsg = (message, isError = false) => {
     setFlash({ message, isError });
     setTimeout(() => setFlash(null), 4000);
+  };
+
+  const openEditSub = (sub) => {
+    setSubTitle(sub.title);
+    setSubStart(sub.startDate);
+    setSubEnd(sub.endDate);
+    setSubVisitsTotal(sub.visitsTotal === null ? '' : String(sub.visitsTotal));
+    setSubVisitsLeft(sub.visitsLeft === null ? '' : String(sub.visitsLeft));
+    setEditingSub(true);
+  };
+
+  const saveEditSub = async () => {
+    try {
+      await editSubscription(client, {
+        title: subTitle.trim(),
+        startDate: subStart,
+        endDate: subEnd,
+        visitsTotal: subVisitsTotal === '' ? null : Number(subVisitsTotal),
+        visitsLeft: subVisitsTotal === '' ? null : Number(subVisitsLeft)
+      });
+      setEditingSub(false);
+      load();
+    } catch (err) { flashMsg(err.message, true); }
   };
 
   const load = async () => {
@@ -252,14 +281,31 @@ function ClientCard({ id }) {
             </p>
           ) : s ? (
             <>
-              <div className={'sub-info status-' + (s.freeze.active || !decision.allow ? 'deny' : decision.level)}>
-                <div className="sub-title">{s.title}</div>
-                <div>Діє: {formatDate(s.startDate)} — {formatDate(s.endDate)}</div>
-                <div>{s.visitsLeft === null ? 'Безліміт' : `Візитів: ${s.visitsLeft} з ${s.visitsTotal}`}</div>
-                {s.freeze.active
-                  ? <div>❄ Заморожено з {formatDate(s.freeze.since)} ({FREEZE_REASONS[s.freeze.reason]})</div>
-                  : <div className="muted">Заморозка: використано {s.freeze.daysUsed} з {CONFIG.MAX_FREEZE_DAYS} дн. (служба — без ліміту)</div>}
-              </div>
+              {editingSub ? (
+                <div className="inline-form wrap">
+                  <input type="text" placeholder="Назва" value={subTitle} onChange={(e) => setSubTitle(e.target.value)} />
+                  <label>Початок: <input type="date" value={subStart} onChange={(e) => setSubStart(e.target.value)} /></label>
+                  <label>Кінець: <input type="date" value={subEnd} onChange={(e) => setSubEnd(e.target.value)} /></label>
+                  <input type="number" placeholder="Візитів всього (порожньо = безліміт)" min={0}
+                    value={subVisitsTotal} onChange={(e) => setSubVisitsTotal(e.target.value)} />
+                  <input type="number" placeholder="Залишок візитів" min={0} disabled={subVisitsTotal === ''}
+                    value={subVisitsTotal === '' ? '' : subVisitsLeft} onChange={(e) => setSubVisitsLeft(e.target.value)} />
+                  <button type="button" className="btn-primary" onClick={saveEditSub}>Зберегти</button>
+                  <button type="button" onClick={() => setEditingSub(false)}>Скасувати</button>
+                </div>
+              ) : (
+                <>
+                  <div className={'sub-info status-' + (s.freeze.active || !decision.allow ? 'deny' : decision.level)}>
+                    <div className="sub-title">{s.title}</div>
+                    <div>Діє: {formatDate(s.startDate)} — {formatDate(s.endDate)}</div>
+                    <div>{s.visitsLeft === null ? 'Безліміт' : `Візитів: ${s.visitsLeft} з ${s.visitsTotal}`}</div>
+                    {s.freeze.active
+                      ? <div>❄ Заморожено з {formatDate(s.freeze.since)} ({FREEZE_REASONS[s.freeze.reason]})</div>
+                      : <div className="muted">Заморозка: використано {s.freeze.daysUsed} з {CONFIG.MAX_FREEZE_DAYS} дн. (служба — без ліміту)</div>}
+                  </div>
+                  <button type="button" className="small" onClick={() => openEditSub(s)}>✏️ Редагувати абонемент</button>
+                </>
+              )}
               {s.freeze.active ? (
                 <button type="button" className="btn-primary" onClick={async () => {
                   await unfreezeSubscription(client);

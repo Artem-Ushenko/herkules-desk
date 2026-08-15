@@ -43,6 +43,17 @@ export async function sellSubscription(client, tariff, { startDate, method, note
   return payment;
 }
 
+// Виправлення вже проданого абонемента (помилка касира при продажу: не той
+// тариф, дата, залишок візитів) — на відміну від Payment/Visit, підписка
+// не історичний запис, а поточний стан клієнта, тому редагується напряму.
+export async function editSubscription(client, { title, startDate, endDate, visitsTotal, visitsLeft }) {
+  const sub = client.subscription;
+  if (!sub) throw new Error('Немає абонемента');
+  client.subscription = { ...sub, title, startDate, endDate, visitsTotal, visitsLeft };
+  await put(STORES.clients, client);
+  return client.subscription;
+}
+
 // Скільки днів заморозки ще доступно (для причин, крім служби)
 export function freezeAllowance(sub) {
   return CONFIG.MAX_FREEZE_DAYS - (sub.freeze.daysUsed || 0);
