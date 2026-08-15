@@ -13,7 +13,7 @@ import {
 } from '../backup.js';
 import {
   getCurrentShift, getStaffList, addStaffName,
-  openShift, closeCurrentShift, getRecentClosedShifts, summarize
+  openShift, getRecentClosedShifts
 } from '../shifts.js';
 import { getCloudReportConfig, setCloudReportConfig, trySendReport } from '../cloud.js';
 
@@ -130,10 +130,7 @@ function ShiftBox() {
   const [showAdd, setShowAdd] = useState(false);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
-  const [closedInfo, setClosedInfo] = useState(null);
   const [openingCash, setOpeningCash] = useState('');
-  const [closePreview, setClosePreview] = useState(null); // не null = показана модалка закриття
-  const [countedCash, setCountedCash] = useState('');
 
   const load = async () => {
     const [cur, staff, rec] = await Promise.all([getCurrentShift(), getStaffList(), getRecentClosedShifts()]);
@@ -160,35 +157,6 @@ function ShiftBox() {
     }
   };
 
-  // Підсумок рахується ще ДО закриття (summarize не пише в БД), щоб показати
-  // очікувану готівку в модалці, поки той, хто закриває, ще не підтвердив.
-  const handleCloseClick = async () => {
-    setError(null);
-    try {
-      setCountedCash('');
-      setClosePreview(await summarize(shift));
-    } catch (e) {
-      setError(e.message);
-    }
-  };
-
-  const handleConfirmClose = async () => {
-    setBusy(true);
-    setError(null);
-    try {
-      const counted = countedCash === '' ? null : Number(countedCash);
-      const closed = await closeCurrentShift('staff', counted);
-      setClosedInfo(closed);
-      setClosePreview(null);
-      notifyChanged();
-      await load();
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const handleAddStaff = async (e) => {
     e.preventDefault();
     setError(null);
@@ -204,26 +172,21 @@ function ShiftBox() {
 
   if (shift === undefined) return <div className="box"><h2>Зміна</h2></div>;
 
-  const expectedCash = closePreview ? (shift.openingCash ?? 0) + closePreview.cashTotal : 0;
-  const cashDelta = countedCash === '' ? null : Number(countedCash) - expectedCash;
-
   return (
     <div className="box">
       <h2>Зміна</h2>
       <p className="muted">
         Хто чергував на стійці, скільки візитів і оплат відбулось — відкриття/закриття
         також відкриває/закриває допуск за карткою. Розмінна готівка фіксується на
-        вході й звіряється з підрахунком при закритті.
+        вході й звіряється з підрахунком при закритті. Закрити зміну — кнопкою
+        «Закрити зміну» в шапці застосунку (доступна на будь-якому екрані).
       </p>
 
       {shift ? (
-        <>
-          <p className="status-ok">
-            👤 {shift.staff} · з {new Date(shift.openedAt).toLocaleTimeString('uk', { hour: '2-digit', minute: '2-digit' })}
-            {' · розмінна '}{fmtMoney(shift.openingCash ?? 0)}
-          </p>
-          <button type="button" className="btn-danger" onClick={handleCloseClick}>Закрити зміну</button>
-        </>
+        <p className="status-ok">
+          👤 {shift.staff} · з {new Date(shift.openedAt).toLocaleTimeString('uk', { hour: '2-digit', minute: '2-digit' })}
+          {' · розмінна '}{fmtMoney(shift.openingCash ?? 0)}
+        </p>
       ) : (
         <>
           <div className="cash-count-row" style={{ marginTop: 0, maxWidth: 280 }}>
@@ -257,63 +220,6 @@ function ShiftBox() {
       )}
 
       {error && <p className="status-deny">{error}</p>}
-
-      {closePreview && (
-        <div className="modal-overlay" onClick={() => !busy && setClosePreview(null)}>
-          <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-            <h2>Закрити зміну?</h2>
-            <ul className="shift-summary">
-              <li><span>Співробітник</span><strong>👤 {shift.staff}</strong></li>
-              <li><span>Візитів</span><strong>{closePreview.visitCount}</strong></li>
-              <li><span>Оплат</span><strong>{closePreview.paymentCount} на {fmtMoney(closePreview.total)}</strong></li>
-              <li><span>· готівкою</span><strong>{fmtMoney(closePreview.cashTotal)}</strong></li>
-              <li><span>· карткою</span><strong>{fmtMoney(closePreview.cardTotal)}</strong></li>
-              <li><span>Розмінна на початку</span><strong>{fmtMoney(shift.openingCash ?? 0)}</strong></li>
-              <li><span>Має бути в касі</span><strong>{fmtMoney(expectedCash)}</strong></li>
-            </ul>
-
-            <div className="cash-count-row">
-              <label htmlFor="counted-cash">Порахована готівка</label>
-              <input
-                id="counted-cash"
-                type="number"
-                inputMode="numeric"
-                min="0"
-                placeholder="₴"
-                autoFocus
-                value={countedCash}
-                onChange={(e) => setCountedCash(e.target.value)}
-              />
-            </div>
-            {cashDelta !== null && (
-              <p className={'cash-delta ' + (cashDelta === 0 ? 'ok' : 'bad')} style={{ textAlign: 'right' }}>
-                {cashDelta === 0
-                  ? '✓ Каса зійшлася'
-                  : `Δ ${cashDelta > 0 ? '+' : ''}${fmtMoney(cashDelta)} ${cashDelta > 0 ? '(надлишок)' : '(недостача)'}`}
-              </p>
-            )}
-
-            <div className="modal-actions">
-              <button type="button" disabled={busy} onClick={() => setClosePreview(null)}>Скасувати</button>
-              <button type="button" className="btn-danger" disabled={busy} onClick={handleConfirmClose}>
-                {busy ? 'Закриваємо…' : 'Закрити зміну'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {closedInfo && (
-        <p className="muted">
-          Закрито: {closedInfo.staff} — візитів {closedInfo.visitCount}, оплат {closedInfo.paymentCount}{' '}
-          (готівка {fmtMoney(closedInfo.cashTotal)} · картка {fmtMoney(closedInfo.cardTotal)}){' '}
-          {closedInfo.countedCash != null && (
-            closedInfo.countedCash === closedInfo.expectedCash
-              ? '· каса зійшлася'
-              : `· Δ ${closedInfo.countedCash - closedInfo.expectedCash > 0 ? '+' : ''}${fmtMoney(closedInfo.countedCash - closedInfo.expectedCash)}`
-          )}
-        </p>
-      )}
 
       {recent.length > 0 && (
         <table className="data-table compact" style={{ marginTop: '.75rem' }}>
