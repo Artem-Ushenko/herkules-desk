@@ -43,6 +43,14 @@ export function formatShiftCloseReport(shift) {
     `💰 Оплат: ${shift.paymentCount} на суму <b>${money(shift.total)}</b> ` +
       `(готівка ${money(shift.cashTotal)} · картка ${money(shift.cardTotal)})`
   ];
+  if (!bySystem) {
+    lines.push(`💵 Готівка на початку зміни: ${money(shift.openingCash ?? 0)}`);
+    lines.push(shift.countedCash != null
+      ? (shift.countedCash === shift.expectedCash
+        ? `💵 Готівка на кінець зміни: ${money(shift.countedCash)} — ✓ зійшлося`
+        : `💵 Готівка на кінець зміни: ${money(shift.countedCash)}, мало бути ${money(shift.expectedCash)} — ⚠️ Δ ${shift.countedCash - shift.expectedCash > 0 ? '+' : ''}${money(shift.countedCash - shift.expectedCash)}`)
+      : `💵 Готівку на кінець зміни не перераховано (мало бути ${money(shift.expectedCash)})`);
+  }
   return lines.join('\n');
 }
 

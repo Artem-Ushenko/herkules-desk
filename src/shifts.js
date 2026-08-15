@@ -2,10 +2,17 @@
 //
 // Гейт допуску (ShiftGate.jsx/App.jsx): поки зміну не відкрито явно, стійка
 // (допуск за карткою) не рендериться — «хто на зміні» запитується перед
-// стартом роботи. НЕ каса: фізична каса й рахунок готівки — у сестринському
-// проєкті (Геркулес Шоп, той самий стек); тут лише прив'язка Payment/Visit
-// до того, хто чергував, і зведений звіт при закритті — хто, коли, скільки
-// візитів і оплат (готівка/картка) відбулось за цей час.
+// стартом роботи. Прив'язка Payment/Visit до того, хто чергував, і зведений
+// звіт при закритті — хто, коли, скільки візитів і оплат (готівка/картка)
+// відбулось за цей час.
+//
+// Перерахунок готівки — той самий принцип, що в сестринському проєкті
+// (Геркулес Шоп, mini_shop_POS/src/db.js: openShift/closeShiftLocal):
+// openingCash фіксується на вході, expectedCash = openingCash + готівковий
+// виторг рахується при закритті, countedCash — те, що фактично нарахував
+// той, хто закриває. Δ (розбіжність) видно в Налаштуваннях і в Telegram-звіті
+// (cloud.js). Автозакриття системою (забули закрити) countedCash не питає —
+// лишається null, як і в Шопі.
 
 import { CONFIG } from './config.js';
 import { STORES, getAll, getAllByIndex, put, getMeta, setMeta } from './db.js';
@@ -49,7 +56,9 @@ export async function removeStaffName(name) {
 
 // Підсумок зміни: візити й оплати, прив'язані до неї за shiftId (currentShiftId()
 // у visits.js/subscriptions.js виставляє це поле в момент створення запису).
-async function summarize(shift) {
+// Експортується окремо від closeRecord, щоб екран закриття міг показати
+// попередній підсумок (і очікувану готівку) ще ДО фактичного закриття зміни.
+export async function summarize(shift) {
   const [visits, payments] = await Promise.all([
     getAllByIndex(STORES.visits, 'shiftId', shift.id),
     getAllByIndex(STORES.payments, 'shiftId', shift.id)
@@ -65,9 +74,17 @@ async function summarize(shift) {
   };
 }
 
-async function closeRecord(shift, closedBy) {
+async function closeRecord(shift, closedBy, countedCash = null) {
   const stats = await summarize(shift);
-  const closed = { ...shift, closedAt: Date.now(), closedBy, ...stats };
+  const expectedCash = (shift.openingCash ?? 0) + stats.cashTotal;
+  const closed = {
+    ...shift,
+    closedAt: Date.now(),
+    closedBy,
+    ...stats,
+    expectedCash,
+    countedCash: countedCash === null ? null : Math.round(Number(countedCash) || 0)
+  };
   await put(STORES.shifts, closed);
   // Звіт у Telegram (cloud.js) — best effort, не чекаємо і не блокуємо закриття
   // зміни. Єдина точка виклику охоплює всі шляхи закриття: явне, автозакриття
@@ -78,9 +95,12 @@ async function closeRecord(shift, closedBy) {
 
 // Відкриває зміну. Якщо існує незакрита стара зміна (забули закрити) —
 // спочатку закриває її від імені системи. Повертає { shift, autoClosed }.
-export async function openShift(staff) {
+// openingCash — розмінна готівка в касі на початку зміни (₴).
+export async function openShift(staff, openingCash = 0) {
   const name = (staff ?? '').trim();
   if (!name) throw new Error('Вкажіть, хто відкриває зміну');
+  const opening = Math.round(Number(openingCash) || 0);
+  if (opening < 0) throw new Error('Розмінна готівка не може бути від\'ємною');
 
   const stale = await getCurrentShift();
   const autoClosed = stale ? await closeRecord(stale, 'system') : null;
@@ -93,18 +113,23 @@ export async function openShift(staff) {
     closedBy: null,
     visitCount: 0,
     paymentCount: 0,
+    openingCash: opening,
     cashTotal: 0,
     cardTotal: 0,
+    countedCash: null,
+    expectedCash: null,
     total: 0
   };
   await put(STORES.shifts, shift);
   return { shift, autoClosed };
 }
 
-export async function closeCurrentShift(closedBy = 'staff') {
+// countedCash — готівка, яку фактично нарахували в касі при закритті (null —
+// перерахунок не проводився, напр. автозакриття системою).
+export async function closeCurrentShift(closedBy = 'staff', countedCash = null) {
   const open = await getCurrentShift();
   if (!open) return null;
-  return closeRecord(open, closedBy);
+  return closeRecord(open, closedBy, countedCash);
 }
 
 // Прив'язка нового Payment/Visit до відкритої зміни (checkIn()/sellSubscription()) —

@@ -2,9 +2,9 @@
 // хто чергує), решта застосунку (стійка, продажі тощо) не рендериться — див.
 // App.jsx. Структура і текст — ті самі, що в OpenShiftScreen.jsx сестринського
 // проєкту (Геркулес Шоп, mini_shop_POS/src/screens/OpenShiftScreen.jsx): вибір
-// зі списку → підтвердження в модалці → openShift(). Клубні поля (точка,
-// розмінна готівка, ярлики Облік/Журнал/Налаштування) з Шопу свідомо не
-// перенесені — для клубу сенсу не мають.
+// зі списку → підтвердження в модалці → openShift(). Розмінна готівка —
+// той самий принцип, що в Шопі: фіксується тут, порівнюється з підрахованою
+// при закритті зміни (SettingsScreen.jsx ShiftBox).
 
 import { useEffect, useState } from 'react';
 import { getStaffList, addStaffName, renameStaffName, removeStaffName, openShift } from '../shifts.js';
@@ -19,6 +19,7 @@ export default function ShiftGate() {
   const [editingStaff, setEditingStaff] = useState(null);
   const [editStaffName, setEditStaffName] = useState('');
   const [confirmingDelete, setConfirmingDelete] = useState(null);
+  const [openingCash, setOpeningCash] = useState('');
 
   useEffect(() => { getStaffList().then(setStaffList); }, []);
 
@@ -28,7 +29,7 @@ export default function ShiftGate() {
     setOpening(true);
     setError(null);
     try {
-      await openShift(staff);
+      await openShift(staff, Number(openingCash) || 0);
       notifyChanged();
     } catch (e) {
       setError(e.message);
@@ -82,6 +83,19 @@ export default function ShiftGate() {
     <div className="shift-gate">
       <div className="shift-gate-card">
         <h1 className="gate-brand">ГЕРКУЛЕС КЛУБ</h1>
+
+        <div className="cash-count-row">
+          <label htmlFor="opening-cash">Розмінна готівка в касі</label>
+          <input
+            id="opening-cash"
+            type="number"
+            inputMode="numeric"
+            min="0"
+            placeholder="0 ₴"
+            value={openingCash}
+            onChange={(e) => setOpeningCash(e.target.value)}
+          />
+        </div>
 
         <h2 className="setup-subtitle">Хто відкриває зміну?</h2>
         <div className="staff-pick-list">
@@ -146,6 +160,7 @@ export default function ShiftGate() {
               <h2>Відкрити зміну?</h2>
               <ul className="shift-summary">
                 <li><span>Співробітник</span><strong>👤 {confirmingStaff}</strong></li>
+                <li><span>Розмінна готівка</span><strong>{(Number(openingCash) || 0).toLocaleString('uk-UA')} ₴</strong></li>
               </ul>
               <div className="modal-actions">
                 <button type="button" disabled={opening} onClick={() => setConfirmingStaff(null)}>
