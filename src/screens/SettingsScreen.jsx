@@ -24,6 +24,12 @@ function TariffsBox() {
   const [days, setDays] = useState('');
   const [price, setPrice] = useState('');
   const [forVets, setForVets] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [etTitle, setEtTitle] = useState('');
+  const [etVisits, setEtVisits] = useState('');
+  const [etDays, setEtDays] = useState('');
+  const [etPrice, setEtPrice] = useState('');
+  const [etForVets, setEtForVets] = useState(false);
 
   const load = async () => setTariffs(await getAll(STORES.tariffs));
   useEffect(() => { load(); }, []);
@@ -42,6 +48,28 @@ function TariffsBox() {
     load();
   };
 
+  const startEdit = (t) => {
+    setEditingId(t.id);
+    setEtTitle(t.title);
+    setEtVisits(t.visits === null ? '' : String(t.visits));
+    setEtDays(String(t.days));
+    setEtPrice(String(t.price));
+    setEtForVets(t.forVeterans);
+  };
+
+  const saveEdit = async (t) => {
+    await put(STORES.tariffs, {
+      ...t,
+      title: etTitle.trim(),
+      visits: etVisits ? Number(etVisits) : null,
+      days: Number(etDays),
+      price: Number(etPrice),
+      forVeterans: etForVets
+    });
+    setEditingId(null);
+    load();
+  };
+
   return (
     <div className="box">
       <h2>Тарифи</h2>
@@ -50,14 +78,29 @@ function TariffsBox() {
           <tr>{['Назва', 'Візитів', 'Днів', 'Ціна', 'Для ветеранів', ''].map((t) => <th key={t}>{t}</th>)}</tr>
         </thead>
         <tbody>
-          {tariffs.map((t) => (
+          {tariffs.map((t) => editingId === t.id ? (
+            <tr key={t.id}>
+              <td><input type="text" value={etTitle} onChange={(e) => setEtTitle(e.target.value)} /></td>
+              <td><input type="number" placeholder="безліміт" min={1} style={{ width: 90 }} value={etVisits} onChange={(e) => setEtVisits(e.target.value)} /></td>
+              <td><input type="number" min={1} style={{ width: 70 }} value={etDays} onChange={(e) => setEtDays(e.target.value)} /></td>
+              <td><input type="number" min={0} style={{ width: 90 }} value={etPrice} onChange={(e) => setEtPrice(e.target.value)} /></td>
+              <td><input type="checkbox" checked={etForVets} onChange={(e) => setEtForVets(e.target.checked)} /></td>
+              <td>
+                <button type="button" className="btn-primary" onClick={() => saveEdit(t)}>Зберегти</button>{' '}
+                <button type="button" onClick={() => setEditingId(null)}>Скасувати</button>
+              </td>
+            </tr>
+          ) : (
             <tr key={t.id}>
               <td>{t.title}</td>
               <td>{t.visits === null ? 'безліміт' : String(t.visits)}</td>
               <td>{t.days}</td>
               <td>{fmtMoney(t.price)}</td>
               <td>{t.forVeterans ? 'так' : ''}</td>
-              <td><ArmedButton label="Видалити" confirmLabel="Точно?" onConfirm={async () => { await remove(STORES.tariffs, t.id); load(); }} /></td>
+              <td>
+                <button type="button" className="small" onClick={() => startEdit(t)}>✏️ Редагувати</button>{' '}
+                <ArmedButton label="Видалити" confirmLabel="Точно?" onConfirm={async () => { await remove(STORES.tariffs, t.id); load(); }} />
+              </td>
             </tr>
           ))}
         </tbody>
