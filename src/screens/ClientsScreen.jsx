@@ -9,7 +9,7 @@ import { listOpenVisits } from '../visits.js';
 import { sellSubscription, freezeSubscription, unfreezeSubscription, editSubscription, FREEZE_REASONS } from '../subscriptions.js';
 import { barcodeSVG } from '../barcode.js';
 import { qrSVG } from '../qr.js';
-import { fmtMoney, fmtDateTime, downloadCSV } from '../utils.js';
+import { fmtMoney, fmtDateTime, downloadCSV, paymentMethodLabel } from '../utils.js';
 import ArmedButton from '../components/ArmedButton.jsx';
 
 const TYPE_LABELS = { member: 'Клієнт', guest: 'Гість орендаря', trainer: 'Тренер' };
@@ -166,6 +166,9 @@ function ClientCard({ id }) {
   const [flash, setFlash] = useState(null);
   const [tariffId, setTariffId] = useState('');
   const [method, setMethod] = useState('cash');
+  const [splitPay, setSplitPay] = useState(false);
+  const [cashAmount, setCashAmount] = useState('');
+  const [cardAmount, setCardAmount] = useState('');
   const [startDate, setStartDate] = useState(toISODate(new Date()));
   const [freezeReason, setFreezeReason] = useState('service');
   const [editingSub, setEditingSub] = useState(false);
@@ -334,26 +337,71 @@ function ClientCard({ id }) {
               <h3>{s ? 'Продати новий' : 'Продати абонемент'}</h3>
               {!tariffs.length ? (
                 <p className="muted">Немає тарифів — додайте у <a href="#settings">Налаштуваннях</a></p>
-              ) : (
-                <div className="sell-form">
-                  <select value={tariffId || available[0]?.id || ''} onChange={(e) => setTariffId(e.target.value)}>
-                    {available.map((t) => (
-                      <option key={t.id} value={t.id}>{t.title} — {fmtMoney(t.price)} ({t.visits ?? 'безліміт'} віз., {t.days} дн.)</option>
-                    ))}
-                  </select>
-                  <select value={method} onChange={(e) => setMethod(e.target.value)}>
-                    <option value="cash">Готівка</option>
-                    <option value="card">Картка</option>
-                  </select>
-                  <label>Початок: <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
-                  <button type="button" className="btn-primary" onClick={async () => {
-                    const tariff = available.find((t) => t.id === (tariffId || available[0]?.id));
-                    if (!tariff) return;
-                    await sellSubscription(client, tariff, { startDate, method });
-                    load();
-                  }}>Продати</button>
-                </div>
-              )}
+              ) : (() => {
+                const selectedTariff = available.find((t) => t.id === (tariffId || available[0]?.id));
+                const splitCash = Number(cashAmount) || 0;
+                const splitCard = Number(cardAmount) || 0;
+                const splitDelta = selectedTariff ? splitCash + splitCard - selectedTariff.price : 0;
+                return (
+                  <div className="sell-form">
+                    <select value={tariffId || available[0]?.id || ''} onChange={(e) => setTariffId(e.target.value)}>
+                      {available.map((t) => (
+                        <option key={t.id} value={t.id}>{t.title} — {fmtMoney(t.price)} ({t.visits ?? 'безліміт'} віз., {t.days} дн.)</option>
+                      ))}
+                    </select>
+                    {!splitPay ? (
+                      <select value={method} onChange={(e) => setMethod(e.target.value)}>
+                        <option value="cash">Готівка</option>
+                        <option value="card">Картка</option>
+                      </select>
+                    ) : (
+                      <>
+                        <div className="cash-count-row" style={{ marginTop: 0 }}>
+                          <label>Готівкою</label>
+                          <input type="number" inputMode="numeric" min="0" value={cashAmount} onChange={(e) => setCashAmount(e.target.value)} />
+                        </div>
+                        <div className="cash-count-row" style={{ marginTop: 0 }}>
+                          <label>Карткою</label>
+                          <input type="number" inputMode="numeric" min="0" value={cardAmount} onChange={(e) => setCardAmount(e.target.value)} />
+                        </div>
+                        {selectedTariff && (
+                          <p className={'cash-delta ' + (splitDelta === 0 ? 'ok' : 'bad')}>
+                            {splitDelta === 0
+                              ? '✓ Сходиться з ціною тарифу'
+                              : `Δ ${splitDelta > 0 ? '+' : ''}${fmtMoney(splitDelta)} до ціни тарифу`}
+                          </p>
+                        )}
+                      </>
+                    )}
+                    <button type="button" className="small" onClick={() => {
+                      setSplitPay(!splitPay);
+                      if (!splitPay && selectedTariff) { setCashAmount(String(selectedTariff.price)); setCardAmount('0'); }
+                    }}>
+                      {splitPay ? '← Один спосіб оплати' : 'Розділити оплату (готівка + картка)'}
+                    </button>
+                    <label>Початок: <input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} /></label>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={splitPay && splitDelta !== 0}
+                      onClick={async () => {
+                        if (!selectedTariff) return;
+                        try {
+                          if (splitPay) {
+                            await sellSubscription(client, selectedTariff, { startDate, cashAmount: splitCash, cardAmount: splitCard });
+                          } else {
+                            await sellSubscription(client, selectedTariff, { startDate, method });
+                          }
+                          setSplitPay(false);
+                          load();
+                        } catch (e) {
+                          flashMsg(e.message, true);
+                        }
+                      }}
+                    >Продати</button>
+                  </div>
+                );
+              })()}
             </>
           )}
         </div>
@@ -381,7 +429,7 @@ function ClientCard({ id }) {
                   <td>{fmtDateTime(p.date)}</td>
                   <td>{p.item}</td>
                   <td className={p.amount < 0 ? 'status-deny' : ''}>{fmtMoney(p.amount)}</td>
-                  <td className="muted">{p.method === 'cash' ? 'готівка' : 'картка'}</td>
+                  <td className="muted">{paymentMethodLabel(p)}</td>
                 </tr>
               ))}
             </tbody>

@@ -63,8 +63,10 @@ export async function summarize(shift) {
     getAllByIndex(STORES.visits, 'shiftId', shift.id),
     getAllByIndex(STORES.payments, 'shiftId', shift.id)
   ]);
-  const cashTotal = payments.filter((p) => p.method === 'cash').reduce((sum, p) => sum + p.amount, 0);
-  const cardTotal = payments.filter((p) => p.method === 'card').reduce((sum, p) => sum + p.amount, 0);
+  // cashAmount/cardAmount — платежі після впровадження розділеної оплати;
+  // старі записи (лише method+amount) рахуються цілком одним способом.
+  const cashTotal = payments.reduce((sum, p) => sum + (p.cashAmount ?? (p.method === 'cash' ? p.amount : 0)), 0);
+  const cardTotal = payments.reduce((sum, p) => sum + (p.cardAmount ?? (p.method === 'card' ? p.amount : 0)), 0);
   return {
     visitCount: visits.length,
     paymentCount: payments.length,

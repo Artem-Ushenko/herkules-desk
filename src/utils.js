@@ -1,5 +1,19 @@
 // Дрібні форматери, спільні для екранів.
 
+// Готівка/картка з payment.cashAmount/cardAmount (розділена оплата), з фолбеком
+// на старий payment.method+amount для записів до впровадження цього поля.
+export function paymentSplit(p) {
+  const cash = Math.abs(p.cashAmount ?? (p.method === 'cash' ? p.amount : 0));
+  const card = Math.abs(p.cardAmount ?? (p.method === 'card' ? p.amount : 0));
+  return { cash, card };
+}
+
+export function paymentMethodLabel(p) {
+  const { cash, card } = paymentSplit(p);
+  if (cash > 0 && card > 0) return `💵 ${fmtMoney(cash)} · 💳 ${fmtMoney(card)}`;
+  return card > 0 ? 'картка' : 'готівка';
+}
+
 export function fmtMoney(n) {
   return new Intl.NumberFormat('uk-UA', { style: 'currency', currency: 'UAH', maximumFractionDigits: 0 }).format(n);
 }

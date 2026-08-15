@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react';
 import { STORES, getAll, put } from '../db.js';
 import { toISODate } from '../access.js';
-import { fmtMoney, fmtDateTime, downloadCSV } from '../utils.js';
+import { fmtMoney, fmtDateTime, downloadCSV, paymentSplit } from '../utils.js';
 import ArmedButton from '../components/ArmedButton.jsx';
 import { currentShiftId } from '../shifts.js';
 
@@ -15,18 +15,58 @@ function defaultFrom() {
   return toISODate(new Date(now.getFullYear(), now.getMonth(), 1));
 }
 
+// Спосіб оплати рідко буває введений неправильно (касир натиснув не той
+// варіант) — виправляється тут, як роздільна сума готівка/картка, а не лише
+// перемиканням одного з двох варіантів (payment може бути й розділеним).
 function MethodCell({ payment, onSaved }) {
+  const target = Math.abs(payment.amount);
+  const sign = payment.amount < 0 ? -1 : 1;
+  const cur = paymentSplit(payment);
+  const [editing, setEditing] = useState(false);
+  const [cashVal, setCashVal] = useState(String(cur.cash));
+  const [cardVal, setCardVal] = useState(String(cur.card));
+  const [err, setErr] = useState(null);
+
+  const startEdit = () => {
+    setCashVal(String(cur.cash));
+    setCardVal(String(cur.card));
+    setErr(null);
+    setEditing(true);
+  };
+
+  const save = async () => {
+    const c = Math.round(Number(cashVal) || 0);
+    const k = Math.round(Number(cardVal) || 0);
+    if (c < 0 || k < 0 || c + k !== target) {
+      setErr(`Сума має дорівнювати ${fmtMoney(target)}`);
+      return;
+    }
+    await put(STORES.payments, {
+      ...payment,
+      method: c > 0 && k > 0 ? 'split' : (k > 0 ? 'card' : 'cash'),
+      cashAmount: sign * c,
+      cardAmount: sign * k
+    });
+    setEditing(false);
+    onSaved();
+  };
+
+  if (!editing) {
+    return (
+      <span onClick={startEdit} title="Виправити спосіб оплати" style={{ cursor: 'pointer', textDecoration: 'underline dotted' }}>
+        {cur.cash > 0 && cur.card > 0 ? `💵 ${fmtMoney(cur.cash)} · 💳 ${fmtMoney(cur.card)}` : (cur.card > 0 ? 'картка' : 'готівка')}
+      </span>
+    );
+  }
+
   return (
-    <select
-      value={payment.method}
-      onChange={async (e) => {
-        await put(STORES.payments, { ...payment, method: e.target.value });
-        onSaved();
-      }}
-    >
-      <option value="cash">готівка</option>
-      <option value="card">картка</option>
-    </select>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+      <input type="number" min="0" style={{ width: 64 }} value={cashVal} onChange={(e) => setCashVal(e.target.value)} title="Готівкою" />
+      <input type="number" min="0" style={{ width: 64 }} value={cardVal} onChange={(e) => setCardVal(e.target.value)} title="Карткою" />
+      <button type="button" className="small" onClick={save}>✓</button>
+      <button type="button" className="small" onClick={() => setEditing(false)}>✕</button>
+      {err && <span className="status-deny">{err}</span>}
+    </span>
   );
 }
 
@@ -49,35 +89,35 @@ export default function SalesScreen() {
     .sort((a, b) => b.date.localeCompare(a.date));
   const total = visible.reduce((sum, p) => sum + p.amount, 0);
 
-  const storno = async (p) => {
-    await put(STORES.payments, {
+  // Компенсуючий запис (сторно чи скасування сторно) переносить розбивку
+  // готівка/картка з вихідного платежу з протилежним знаком — інакше сторно
+  // розділеної оплати «губило» одну з частин при перерахунку зміни.
+  const reversalPayment = async (p, note) => {
+    const { cash, card } = paymentSplit(p);
+    return {
       id: crypto.randomUUID(),
       clientId: p.clientId,
       date: new Date().toISOString(),
       amount: -p.amount,
       method: p.method,
+      cashAmount: p.amount < 0 ? cash : -cash,
+      cardAmount: p.amount < 0 ? card : -card,
       item: p.item,
       tariffId: p.tariffId,
-      note: 'сторно ' + p.id.slice(0, 8),
+      note,
       shiftId: await currentShiftId()
-    });
+    };
+  };
+
+  const storno = async (p) => {
+    await put(STORES.payments, await reversalPayment(p, 'сторно ' + p.id.slice(0, 8)));
     load();
   };
 
   // Скасування сторно: ще один компенсуючий запис, що повертає суму назад —
   // сам запис сторно (розділ 2: історичні записи не редагуються) не чіпається.
   const undoStorno = async (p) => {
-    await put(STORES.payments, {
-      id: crypto.randomUUID(),
-      clientId: p.clientId,
-      date: new Date().toISOString(),
-      amount: -p.amount,
-      method: p.method,
-      item: p.item,
-      tariffId: p.tariffId,
-      note: 'скасування сторно ' + p.id.slice(0, 8),
-      shiftId: await currentShiftId()
-    });
+    await put(STORES.payments, await reversalPayment(p, 'скасування сторно ' + p.id.slice(0, 8)));
     load();
   };
 
@@ -89,9 +129,13 @@ export default function SalesScreen() {
         <span className="spacer" />
         <b>Разом: {fmtMoney(total)}</b>
         <button type="button" onClick={() => downloadCSV(`продажі-${from}-${to}.csv`, [
-          ['Дата', 'Клієнт', 'Позиція', 'Сума', 'Спосіб', 'Нотатка'],
-          ...visible.map((p) => [fmtDateTime(p.date), names.get(p.clientId) || p.clientId, p.item,
-            p.amount, p.method === 'cash' ? 'готівка' : 'картка', p.note || ''])
+          ['Дата', 'Клієнт', 'Позиція', 'Сума', 'Готівкою', 'Карткою', 'Нотатка'],
+          ...visible.map((p) => {
+            const { cash, card } = paymentSplit(p);
+            const sign = p.amount < 0 ? -1 : 1;
+            return [fmtDateTime(p.date), names.get(p.clientId) || p.clientId, p.item,
+              p.amount, sign * cash, sign * card, p.note || ''];
+          })
         ])}>Експорт CSV</button>
       </div>
 

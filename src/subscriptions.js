@@ -17,7 +17,25 @@ export function daysBetween(aISO, bISO) {
 
 // Продаж: абонемент замінюється, оплата пишеться один раз і назавжди.
 // endDate = start + days - 1: тариф на 30 днів діє 30 календарних днів включно.
-export async function sellSubscription(client, tariff, { startDate, method, note = '' }) {
+// method — оплата одним способом ('cash'/'card'); або cashAmount+cardAmount —
+// оплата двома способами одночасно (частина готівкою, частина карткою), сума
+// яких має точно дорівнювати tariff.price. Той самий принцип, що createReceipt
+// у сестринському проєкті (Геркулес Шоп, mini_shop_POS/src/db.js).
+export async function sellSubscription(client, tariff, { startDate, method, cashAmount, cardAmount, note = '' }) {
+  const split = cashAmount != null || cardAmount != null;
+  let cash, card;
+  if (split) {
+    cash = Math.round(Number(cashAmount) || 0);
+    card = Math.round(Number(cardAmount) || 0);
+    if (cash < 0 || card < 0) throw new Error('Суми оплати не можуть бути від\'ємними');
+    if (cash + card !== tariff.price) {
+      throw new Error(`Сума оплати (${cash + card} ₴) не збігається з ціною (${tariff.price} ₴)`);
+    }
+  } else {
+    cash = method === 'card' ? 0 : tariff.price;
+    card = method === 'card' ? tariff.price : 0;
+  }
+
   client.subscription = {
     tariffId: tariff.id,
     title: tariff.title,
@@ -33,7 +51,11 @@ export async function sellSubscription(client, tariff, { startDate, method, note
     clientId: client.id,
     date: new Date().toISOString(),
     amount: tariff.price,
-    method,
+    // method лишається для сумісності зі старими записами/фільтрами — 'split',
+    // коли оплата пройшла двома способами одночасно (див. cashAmount/cardAmount).
+    method: cash > 0 && card > 0 ? 'split' : (card > 0 ? 'card' : 'cash'),
+    cashAmount: cash,
+    cardAmount: card,
     item: tariff.title,
     tariffId: tariff.id,
     note,
