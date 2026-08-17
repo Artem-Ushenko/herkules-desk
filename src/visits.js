@@ -55,7 +55,7 @@ export function withinCheckOutUndoWindow(visit, now = Date.now()) {
   return visit.checkOut !== null && now - visit.checkOut <= CONFIG.UNDO_WINDOW_MIN * 60000;
 }
 
-// Скасування входу: візит видаляється (не сторнується — він ще «не відбувся»),
+// Скасування входу: візит видаляється (не компенсуючим записом — він ще «не відбувся»),
 // списаний візит повертається на баланс. Після вікна — тільки з логуванням.
 export async function cancelCheckIn(visit, { adminOverride = false } = {}) {
   if (!withinUndoWindow(visit) && !adminOverride) {

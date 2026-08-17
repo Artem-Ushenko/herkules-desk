@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 // Двокрокове підтвердження без window.confirm: перший клік озброює кнопку,
 // другий — виконує дію. Автоматично роззброюється через 5с.
-export default function ArmedButton({ label, confirmLabel, onConfirm, className = 'btn-danger' }) {
+export default function ArmedButton({ label, confirmLabel, onConfirm, className = 'btn-danger', title }) {
   const [armed, setArmed] = useState(false);
   const timerRef = useRef(null);
 
@@ -20,7 +20,7 @@ export default function ArmedButton({ label, confirmLabel, onConfirm, className 
   };
 
   return (
-    <button type="button" className={armed ? className : ''} onClick={handleClick}>
+    <button type="button" className={armed ? className : ''} title={armed ? undefined : title} onClick={handleClick}>
       {armed ? confirmLabel : label}
     </button>
   );

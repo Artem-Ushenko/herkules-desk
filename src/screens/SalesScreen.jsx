@@ -1,10 +1,10 @@
-// Екран «Продажі»: оплати за період, сторно, CSV.
-// Історичні записи не редагуються (розділ 2): виправлення — сторнуючим
+// Екран «Продажі»: оплати за період, скасування, CSV.
+// Історичні записи не редагуються (розділ 2): виправлення — компенсуючим
 // записом; вручну дозаповнюється лише спосіб оплати (готівка/картка) —
 // на практиці касир іноді натискає не той варіант.
 
 import { useEffect, useState } from 'react';
-import { STORES, getAll, put } from '../db.js';
+import { STORES, getAll, put, CANCEL_REASONS } from '../db.js';
 import { toISODate } from '../access.js';
 import { fmtMoney, fmtDateTime, downloadCSV, paymentSplit } from '../utils.js';
 import ArmedButton from '../components/ArmedButton.jsx';
@@ -75,6 +75,7 @@ export default function SalesScreen() {
   const [to, setTo] = useState(toISODate(new Date()));
   const [payments, setPayments] = useState([]);
   const [names, setNames] = useState(new Map());
+  const [confirmingId, setConfirmingId] = useState(null);
 
   const load = async () => {
     const [ps, clients] = await Promise.all([getAll(STORES.payments), getAll(STORES.clients)]);
@@ -89,9 +90,11 @@ export default function SalesScreen() {
     .sort((a, b) => b.date.localeCompare(a.date));
   const total = visible.reduce((sum, p) => sum + p.amount, 0);
 
-  // Компенсуючий запис (сторно чи скасування сторно) переносить розбивку
-  // готівка/картка з вихідного платежу з протилежним знаком — інакше сторно
+  // Компенсуючий запис (скасування чи відновлення оплати) переносить розбивку
+  // готівка/картка з вихідного платежу з протилежним знаком — інакше скасування
   // розділеної оплати «губило» одну з частин при перерахунку зміни.
+  // reversalOf прив'язує запис до платежу, який він компенсує — за ним
+  // контролюється, що саме вже скасовано/відновлено (щоб не скасувати двічі).
   const reversalPayment = async (p, note) => {
     const { cash, card } = paymentSplit(p);
     return {
@@ -105,21 +108,28 @@ export default function SalesScreen() {
       item: p.item,
       tariffId: p.tariffId,
       note,
+      reversalOf: p.id,
       shiftId: await currentShiftId()
     };
   };
 
-  const storno = async (p) => {
-    await put(STORES.payments, await reversalPayment(p, 'сторно ' + p.id.slice(0, 8)));
+  const cancelPayment = async (p, reason) => {
+    await put(STORES.payments, await reversalPayment(p, 'скасування · ' + reason));
+    setConfirmingId(null);
     load();
   };
 
-  // Скасування сторно: ще один компенсуючий запис, що повертає суму назад —
-  // сам запис сторно (розділ 2: історичні записи не редагуються) не чіпається.
-  const undoStorno = async (p) => {
-    await put(STORES.payments, await reversalPayment(p, 'скасування сторно ' + p.id.slice(0, 8)));
+  // Відновлення оплати: ще один компенсуючий запис, що повертає суму назад —
+  // сам запис скасування (розділ 2: історичні записи не редагуються) не чіпається.
+  const restorePayment = async (p) => {
+    await put(STORES.payments, await reversalPayment(p, 'відновлення'));
     load();
   };
+
+  // Платежі, які вже компенсовані (скасовані або відновлені) якимось іншим
+  // записом — рахується по ВСІХ платежах, а не лише у видимому періоді, щоб
+  // компенсацію не можна було «загубити» зміною фільтра дат і скасувати двічі.
+  const reversedIds = new Set(payments.map((p) => p.reversalOf).filter(Boolean));
 
   return (
     <>
@@ -152,11 +162,41 @@ export default function SalesScreen() {
               <td className={p.amount < 0 ? 'status-deny' : ''}>{fmtMoney(p.amount)}</td>
               <td><MethodCell payment={p} onSaved={load} /></td>
               <td>
-                {p.amount > 0 && !p.note.startsWith('сторно') && (
-                  <ArmedButton label="Скасувати оплату" confirmLabel="Скасувати цю оплату? Буде створено компенсуючий запис." onConfirm={() => storno(p)} />
+                {p.amount > 0 && !reversedIds.has(p.id) && confirmingId !== p.id && (
+                  <button
+                    type="button"
+                    title="Оплата залишиться в списку, але її суму компенсує новий запис зі знаком мінус — виторг за період зменшиться. Сам запис оплати не змінюється."
+                    onClick={() => setConfirmingId(p.id)}
+                  >
+                    Скасувати оплату
+                  </button>
                 )}
-                {p.amount < 0 && p.note.startsWith('сторно') && (
-                  <ArmedButton label="Скасувати сторно" confirmLabel="Скасувати це сторно? Оплату буде відновлено новим записом." onConfirm={() => undoStorno(p)} />
+                {confirmingId === p.id && (
+                  <div className="cancel-confirm">
+                    <span>Причина скасування:</span>
+                    {CANCEL_REASONS.map((reason) => (
+                      <button
+                        key={reason}
+                        type="button"
+                        className="btn-danger"
+                        style={{ minHeight: 36, padding: '6px 14px' }}
+                        onClick={() => cancelPayment(p, reason)}
+                      >
+                        {reason[0].toUpperCase() + reason.slice(1)}
+                      </button>
+                    ))}
+                    <button type="button" onClick={() => setConfirmingId(null)}>
+                      Не скасовувати
+                    </button>
+                  </div>
+                )}
+                {p.amount < 0 && p.reversalOf && !reversedIds.has(p.id) && (
+                  <ArmedButton
+                    label="Відновити оплату"
+                    title="Поверне суму скасованої оплати новим записом — саме скасування залишиться в списку."
+                    confirmLabel="Відновити цю оплату? Суму буде повернено новим записом."
+                    onConfirm={() => restorePayment(p)}
+                  />
                 )}
               </td>
             </tr>
