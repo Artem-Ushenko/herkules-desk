@@ -28,7 +28,7 @@ echo.
 REM ── 1. Чекаємо, поки Google Диск змонтує диск ──────────────
 REM Без цього застосунок стартує раніше за диск і втрачає
 REM доступ до папки бекапів — доводиться вказувати її заново
-echo   [1/4] Очікування Google Диска (%DRIVE%)...
+echo   [1/3] Очікування Google Диска (%DRIVE%)...
 set /a TRIES=0
 :waitdrive
 if exist "%DRIVE%\" goto driveok
@@ -49,17 +49,14 @@ goto waitdrive
 echo         Диск %DRIVE% на місці.
 :driveskip
 
-REM ── 2. Щотижневе очищення старих бекапів (лише в неділю) ────
-if exist "%APP_DIR%cleanup-backups.bat" call "%APP_DIR%cleanup-backups.bat"
-
-REM ── 3. Локальний сервер застосунку (build + preview) ────────
+REM ── 2. Локальний сервер застосунку (build + preview) ────────
 REM Обов'язково: File System Access API (бекапи) працює лише в
 REM secure context — просте відкриття index.html з диска не
 REM підійде. Продакшн-режим: зібраний dist/ (без HMR/source-map
 REM накладних витрат), не dev-сервер. Пересобирається щоразу при
 REM старті — для цього проєкту білд займає ~1с, тож дешевше
 REM перестрахуватись, ніж звіряти дату dist/ проти src/.
-echo   [3/4] Збірка застосунку...
+echo   [2/3] Збірка застосунку...
 if not exist "%APP_DIR%node_modules\.bin\vite.cmd" (
   echo.
   echo   ! Не знайдено node_modules\.bin\vite.cmd
@@ -81,8 +78,8 @@ echo   Запуск локального сервера (порт %PORT%)...
 start "Herkules Server" /min "%APP_DIR%node_modules\.bin\vite.cmd" preview --port %PORT% --strictPort
 timeout /t 2 >nul
 
-REM ── 4. Облікова система клубу ───────────────────────────────
-echo   [4/4] Запуск системи обліку клієнтів...
+REM ── 3. Облікова система клубу ───────────────────────────────
+echo   [3/3] Запуск системи обліку клієнтів...
 REM --window-position разом з --start-maximized конфліктують — Chrome
 REM відкриває звичайне (не розгорнуте) вікно. Без позиції --start-maximized
 REM відкриває вікно на весь робочий екран основного монітора самостійно.
@@ -107,3 +104,8 @@ echo   НЕ відкривайте сторонні сайти у робочом
 echo.
 timeout /t 6 >nul
 endlocal
+REM Явне закриття вікна лаунчера — не покладаємось на те, що cmd.exe
+REM саме закриє консоль (залежить від способу виклику: ярлик з
+REM "cmd /k" чи подібне лишило б вікно висіти). Сервер (мінімізоване
+REM вікно "Herkules Server") це НЕ зачіпає — він має лишатись живим.
+exit
