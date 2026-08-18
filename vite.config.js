@@ -9,6 +9,16 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      // Кіоск перезбирається й переоткривається щодня (start-desk.bat), але
+      // тримає той самий Chrome-профіль — старий service worker інакше й
+      // далі обслуговує вчорашній JS-бандл. Дефолтний інжектований
+      // registerSW.js лише реєструє SW і НІКОЛИ не перевіряє оновлення
+      // (жодного registration.update()) — тому кіоск міг тижнями не бачити
+      // нових збірок (той самий баг був у Шопі). injectRegister: null
+      // вимикає той дефолтний скрипт; реальна реєстрація — в src/main.jsx
+      // через virtual:pwa-register, де є явний update() і
+      // автоперезавантаження при новій версії.
+      injectRegister: null,
       includeAssets: ['icons/icon.svg'],
       manifest: {
         name: 'Геркулес Клуб',
