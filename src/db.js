@@ -5,7 +5,7 @@
 import { openDB as idbOpenDB } from 'idb';
 
 export const DB_NAME = 'herkules';
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 export const STORES = {
   clients: 'clients',
@@ -13,7 +13,9 @@ export const STORES = {
   payments: 'payments',
   tariffs: 'tariffs',
   shifts: 'shifts', // чергування адміністратора/рецепціоніста — облік/звітність, БЕЗ каси (розділ shifts.js)
-  meta: 'meta' // службові записи: лічильник карток, handle папки бекапів, журнал дій адміністратора
+  meta: 'meta', // службові записи: лічильник карток, handle папки бекапів, журнал дій адміністратора
+  trainers: 'trainers', // реєстр тренерів — для вибору при продажу персональних занять
+  trainerSessions: 'trainerSessions' // лог проведених персональних тренувань — облік для зп тренерів (TrainersScreen.jsx)
 };
 
 // Дозволені причини скасування оплати — той самий список, що й у сестринському
@@ -51,6 +53,14 @@ function migrate(db, oldVersion, transaction) {
       db.createObjectStore(STORES.shifts, { keyPath: 'id' });
       transaction.objectStore(STORES.visits).createIndex('shiftId', 'shiftId');
       transaction.objectStore(STORES.payments).createIndex('shiftId', 'shiftId');
+      // falls through
+    }
+    // v3: облік тренерів (subscriptions.js: sellTrainerPackage/markTrainerSessionUsed) —
+    // реєстр тренерів + лог проведених персональних занять (для зп, TrainersScreen.jsx)
+    case 2: {
+      db.createObjectStore(STORES.trainers, { keyPath: 'id' });
+      const trainerSessions = db.createObjectStore(STORES.trainerSessions, { keyPath: 'id' });
+      trainerSessions.createIndex('trainerId', 'trainerId');
     }
   }
 }
@@ -128,12 +138,14 @@ export async function nextCardId(prefix) {
 
 // Повний знімок бази для бекапу (розділ 6)
 export async function exportSnapshot() {
-  const [clients, visits, payments, tariffs, shifts] = await Promise.all([
+  const [clients, visits, payments, tariffs, shifts, trainers, trainerSessions] = await Promise.all([
     getAll(STORES.clients),
     getAll(STORES.visits),
     getAll(STORES.payments),
     getAll(STORES.tariffs),
-    getAll(STORES.shifts)
+    getAll(STORES.shifts),
+    getAll(STORES.trainers),
+    getAll(STORES.trainerSessions)
   ]);
   return {
     format: 'herkules-backup',
@@ -141,22 +153,25 @@ export async function exportSnapshot() {
     exportedAt: new Date().toISOString(),
     cardCounter: await getMeta('cardCounter', 0),
     staffList: await getMeta('staffList', []),
-    clients, visits, payments, tariffs, shifts
+    clients, visits, payments, tariffs, shifts, trainers, trainerSessions
   };
 }
 
 // Заміна бази вмістом знімка (відновлення з бекапу)
 export async function importSnapshot(snap) {
   if (snap.format !== 'herkules-backup') throw new Error('Це не файл бекапу Геркулеса');
-  for (const store of [STORES.clients, STORES.visits, STORES.payments, STORES.tariffs, STORES.shifts]) {
+  for (const store of [STORES.clients, STORES.visits, STORES.payments, STORES.tariffs, STORES.shifts, STORES.trainers, STORES.trainerSessions]) {
     await clear(store);
   }
   for (const c of snap.clients) await put(STORES.clients, c);
   for (const v of snap.visits) await put(STORES.visits, v);
   for (const p of snap.payments) await put(STORES.payments, p);
   for (const t of snap.tariffs) await put(STORES.tariffs, t);
-  // v1-бекапи (до появи чергувань) не мають shifts/staffList — приймаються як порожні
+  // v1-бекапи (до появи чергувань) не мають shifts/staffList, v2 — trainers/trainerSessions;
+  // старіші файли приймаються як порожні
   for (const s of snap.shifts || []) await put(STORES.shifts, s);
+  for (const t of snap.trainers || []) await put(STORES.trainers, t);
+  for (const l of snap.trainerSessions || []) await put(STORES.trainerSessions, l);
   await setMeta('cardCounter', snap.cardCounter || 0);
   await setMeta('staffList', snap.staffList || []);
 }

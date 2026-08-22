@@ -6,6 +6,7 @@ import ShiftGate from './components/ShiftGate.jsx';
 import PasswordGate from './components/PasswordGate.jsx';
 import DeskScreen from './screens/DeskScreen.jsx';
 import ClientsScreen from './screens/ClientsScreen.jsx';
+import TrainersScreen from './screens/TrainersScreen.jsx';
 import SalesScreen from './screens/SalesScreen.jsx';
 import JournalScreen from './screens/JournalScreen.jsx';
 import SettingsScreen from './screens/SettingsScreen.jsx';
@@ -15,7 +16,7 @@ import { getCurrentShift, autoCloseStaleShift } from './shifts.js';
 import { retryPendingReports } from './cloud.js';
 import { useBackupStatus } from './hooks/useBackupStatus.js';
 
-const SCREEN_NAMES = ['desk', 'clients', 'sales', 'journal', 'settings'];
+const SCREEN_NAMES = ['desk', 'clients', 'trainers', 'sales', 'journal', 'settings'];
 
 // «Налаштування» — чутливий екран (тарифи, зміни, відновлення бази з файлу):
 // вхід питає пароль адміністратора щоразу заново, без запам'ятовування
@@ -115,6 +116,7 @@ export default function App() {
       <main id="screens">
         {route.screen === 'desk' && <DeskScreen />}
         {route.screen === 'clients' && <ClientsScreen param={route.param} />}
+        {route.screen === 'trainers' && <TrainersScreen />}
         {route.screen === 'sales' && <SalesScreen />}
         {route.screen === 'journal' && <JournalScreen />}
         {route.screen === 'settings' && (

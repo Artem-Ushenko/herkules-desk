@@ -4,10 +4,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { CONFIG } from '../config.js';
 import { STORES, get, put, getMeta, setMeta } from '../db.js';
-import { evaluateAccess } from '../access.js';
+import { evaluateAccess, formatDate, daysUntilExpiry, EXPIRY_REMINDER_DAYS } from '../access.js';
 import { checkIn, checkOut, cancelCheckIn, findOpenVisit, listOpenVisits, withinUndoWindow, reopenVisit, withinCheckOutUndoWindow } from '../visits.js';
+import { getCurrentShift } from '../shifts.js';
+import { getExpiringSoonClients, isExpiryReminderDismissed, dismissExpiryReminder } from '../subscriptions.js';
 
-const TYPE_LABELS = { member: 'Клієнт', guest: 'Гість орендаря', trainer: 'Тренер' };
+const TYPE_LABELS = { member: 'Клієнт', guest: 'Гість' };
 
 function formatDuration(ms) {
   const min = Math.floor(ms / 60000);
@@ -73,7 +75,6 @@ function UnknownCardForm({ code, onCreated }) {
       isVeteran: false,
       medicalNotes: '',
       consentAt: new Date().toISOString(),
-      hostTrainerId: '',
       createdAt: new Date().toISOString(),
       archivedAt: null,
       subscription: null
@@ -102,6 +103,54 @@ function UnknownCardForm({ code, onCreated }) {
       </label>
       <button type="submit" className="btn-primary">Створити клієнта</button>
     </form>
+  );
+}
+
+// Нагадування адміну «обдзвонити тих, у кого скоро закінчується абонемент» —
+// з'являється одразу після відкриття зміни (ShiftGate/ShiftBox шлють подію
+// herkules:shift-changed) і висить на стійці, поки не натиснуть «Всіх
+// сповіщено». Прив'язане до shiftId (subscriptions.js): нова зміна — нове
+// нагадування, навіть якщо список клієнтів не змінився з учора.
+function ExpiryReminderBanner() {
+  const [state, setState] = useState(null); // null = ще не завантажено; 'none' = нема чого показувати
+
+  const load = async () => {
+    const shift = await getCurrentShift();
+    if (!shift || await isExpiryReminderDismissed(shift.id)) {
+      setState('none');
+      return;
+    }
+    const clients = await getExpiringSoonClients();
+    setState(clients.length ? { shiftId: shift.id, clients } : 'none');
+  };
+
+  useEffect(() => {
+    load();
+    document.addEventListener('herkules:shift-changed', load);
+    return () => document.removeEventListener('herkules:shift-changed', load);
+  }, []);
+
+  if (!state || state === 'none') return null;
+
+  return (
+    <div className="banner warn-banner expiry-banner">
+      <div className="expiry-banner-head">
+        <b>🔔 Абонементи скоро закінчуються ({state.clients.length}) — обдзвоніть і нагадайте про продовження</b>
+        <button type="button" className="btn-primary" onClick={async () => {
+          await dismissExpiryReminder(state.shiftId);
+          setState('none');
+        }}>Всіх сповіщено</button>
+      </div>
+      <ul className="expiry-list">
+        {state.clients.map((c) => (
+          <li key={c.id}>
+            <a href={'#clients/' + c.id}>{c.name}</a>
+            {c.phone && <span className="mono">{c.phone}</span>}
+            <span>до {formatDate(c.endDate)} · {c.daysLeft === 0 ? 'сьогодні останній день' : `лишилось ${c.daysLeft} дн.`}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -144,11 +193,13 @@ export default function DeskScreen() {
     return () => document.removeEventListener('click', onClick);
   }, []);
 
+  // Абонемент + термін дії показуємо завжди (не лише коли він спливає) —
+  // адміністратор має бачити це на кожному скані, без походу в картку клієнта.
   function visitBalanceText(client) {
     const s = client.subscription;
     if (!s) return '';
-    if (s.visitsLeft === null) return s.title;
-    return `${s.title} · лишилось ${s.visitsLeft} візит(и)`;
+    const visitsPart = s.visitsLeft === null ? '' : ` · лишилось ${s.visitsLeft} візит(и)`;
+    return `${s.title} · до ${formatDate(s.endDate)}${visitsPart}`;
   }
 
   async function handleScan(rawCode) {
@@ -184,11 +235,21 @@ export default function DeskScreen() {
     await refreshInGym();
 
     const subInfo = visitBalanceText(client);
+    // Нагадування «зателефонувати про продовження» — довший горизонт
+    // (EXPIRY_REMINDER_DAYS), ніж «жовтий» вердикт допуску (WARN_DAYS у access.js):
+    // клієнт може прийти зеленим («ok»), але вже потрапити в горизонт дзвінка.
+    const daysLeft = client.type === 'member' ? daysUntilExpiry(client) : null;
+    const reminder = daysLeft !== null && daysLeft <= EXPIRY_REMINDER_DAYS
+      ? (daysLeft === 0
+        ? 'Сьогодні останній день дії абонемента — нагадайте клієнту про продовження'
+        : `Абонемент закінчується через ${daysLeft} дн. — нагадайте клієнту про продовження`)
+      : null;
+
     if (decision.level === 'warn') {
-      setVerdict({ kind: 'warn', title: 'ПРОХОДЬ ⚠', sub: `${client.name} · ${decision.reason}`, showUndo: true });
+      setVerdict({ kind: 'warn', title: 'ПРОХОДЬ ⚠', sub: `${client.name} · ${subInfo}`, reminder, showUndo: true });
     } else {
       const sub = client.type === 'member' ? subInfo : TYPE_LABELS[client.type];
-      setVerdict({ kind: 'ok', title: 'ПРОХОДЬ', sub: `${client.name}${sub ? ' · ' + sub : ''}`, showUndo: true });
+      setVerdict({ kind: 'ok', title: 'ПРОХОДЬ', sub: `${client.name}${sub ? ' · ' + sub : ''}`, reminder, showUndo: true });
     }
   }
 
@@ -220,12 +281,14 @@ export default function DeskScreen() {
 
   return (
     <>
+      <ExpiryReminderBanner />
       <div className={'verdict' + (verdict.kind !== 'idle' ? ' ' + verdict.kind : '')}>
         {verdict.name && <div className="v-sub">{verdict.name}</div>}
         <div className="v-title">{verdict.kind === 'idle' ? 'Скануйте картку' : verdict.title}</div>
         {verdict.kind === 'idle'
           ? <div className="v-hint">Сканер працює як клавіатура: код + Enter</div>
           : (verdict.sub && <div className="v-sub">{verdict.sub}</div>)}
+        {verdict.reminder && <div className="v-reminder">🔔 {verdict.reminder}</div>}
         {verdict.sellClientId && (
           <div className="v-actions">
             <a className="btn btn-primary" href={'#clients/' + verdict.sellClientId}>Продати абонемент</a>
@@ -261,7 +324,7 @@ export default function DeskScreen() {
             const time = new Date(v.checkIn).toLocaleTimeString('uk', { hour: '2-digit', minute: '2-digit' });
             return (
               <div className="person-tile" key={v.id}>
-                <div className="p-name">{client ? client.name : v.clientId}</div>
+                <a className="p-name" href={'#clients/' + v.clientId} title="Відкрити картку клієнта">{client ? client.name : v.clientId}</a>
                 <div className="p-meta">зайшов о {time} · у залі {formatDuration(now - v.checkIn)}</div>
                 <span className={'p-type ' + v.clientType}>{TYPE_LABELS[v.clientType] || v.clientType}</span>
               </div>

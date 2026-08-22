@@ -24,15 +24,10 @@ function activeSub(over = {}) {
 }
 
 describe('evaluateAccess', () => {
-  // ── Гілка 1: гість і тренер проходять без абонемента ──
+  // ── Гілка 1: гість проходить без абонемента ──
 
-  it('1. гість орендаря — дозволено без абонемента', () => {
-    const r = evaluateAccess({ type: 'guest', hostTrainerId: 'HC0100' }, NOW);
-    expect(r).toEqual({ allow: true, level: 'ok', reason: '' });
-  });
-
-  it('1. тренер-орендар — дозволено без абонемента', () => {
-    const r = evaluateAccess({ type: 'trainer' }, NOW);
+  it('1. гість — дозволено без абонемента', () => {
+    const r = evaluateAccess({ type: 'guest' }, NOW);
     expect(r).toEqual({ allow: true, level: 'ok', reason: '' });
   });
 

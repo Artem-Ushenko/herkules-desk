@@ -32,8 +32,8 @@ function daysBetween(fromISO, toISO) {
  * @returns {{allow: boolean, level: 'ok'|'warn'|'deny', reason: string}}
  */
 export function evaluateAccess(client, now = new Date()) {
-  // 1. Гості орендаря і тренери проходять без абонемента
-  if (client.type === 'guest' || client.type === 'trainer') {
+  // 1. Гості (запрошені власником залу) проходять без абонемента й без оплати
+  if (client.type === 'guest') {
     return { allow: true, level: 'ok', reason: '' };
   }
 
@@ -81,4 +81,22 @@ export function evaluateAccess(client, now = new Date()) {
 
   // 8
   return { allow: true, level: 'ok', reason: '' };
+}
+
+// Поріг нагадування адміну «зателефонувати клієнту про продовження» — окремо
+// від WARN_DAYS (те попередження про допуск і про «жовтий» вердикт на скані;
+// це — довший горизонт для дзвінка, поки клієнт ще встигає продовжити абонемент).
+export const EXPIRY_REMINDER_DAYS = 5;
+
+// Скільки днів лишилось до кінця активного абонемента — для нагадувань
+// адміністратору (стійка при скані, список після відкриття зміни). null,
+// якщо абонемента нема, він заморожений (лік днів не йде) або вже прострочений
+// (для простроченого нагадування дзвонити пізно — там уже «Закінчився»).
+export function daysUntilExpiry(client, now = new Date()) {
+  const sub = client.subscription;
+  if (!sub || (sub.freeze && sub.freeze.active)) return null;
+  const today = toISODate(now);
+  const end = sub.endDate.slice(0, 10);
+  if (today > end) return null;
+  return daysBetween(today, end);
 }

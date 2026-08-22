@@ -5,6 +5,7 @@ import { fmtMoney } from '../utils.js';
 const TABS = [
   { screen: 'desk', label: 'Стійка' },
   { screen: 'clients', label: 'Клієнти' },
+  { screen: 'trainers', label: 'Тренери' },
   { screen: 'sales', label: 'Продажі' },
   { screen: 'journal', label: 'Журнал' },
   { screen: 'settings', label: 'Налаштування' }

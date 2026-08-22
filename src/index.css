@@ -88,6 +88,7 @@ body {
 .verdict .v-title { font-size: 3rem; font-weight: 800; line-height: 1.1; }
 .verdict .v-sub { font-size: 1.5rem; margin-top: .5rem; }
 .verdict .v-hint { color: var(--muted); font-size: 1.1rem; }
+.verdict .v-reminder { margin-top: .75rem; font-size: 1.15rem; font-weight: 700; color: var(--warn); }
 
 .verdict.ok   { background: var(--ok-bg);   border-color: var(--ok); }
 .verdict.ok .v-title { color: var(--ok); }
@@ -131,11 +132,11 @@ body {
   padding: .75rem 1rem;
 }
 
-.person-tile .p-name { font-weight: 700; font-size: 1.05rem; }
+.person-tile .p-name { font-weight: 700; font-size: 1.05rem; color: inherit; text-decoration: none; }
+.person-tile .p-name:hover { color: var(--accent); text-decoration: underline; }
 .person-tile .p-meta { color: var(--muted); font-size: .85rem; margin-top: .25rem; }
 .person-tile .p-type { display: inline-block; font-size: .75rem; padding: .1rem .5rem; border-radius: 99px; background: var(--bg); margin-top: .4rem; }
 .person-tile .p-type.guest { background: var(--warn-bg); color: var(--warn); }
-.person-tile .p-type.trainer { background: #e0e7ff; color: #3730a3; }
 
 /* ── Кнопки та форми ── */
 
@@ -265,6 +266,12 @@ button:hover, .btn:hover { border-color: var(--accent); }
 }
 .warn-banner { background: var(--warn-bg); color: var(--warn); }
 .ok-banner { background: var(--ok-bg); color: var(--ok); }
+
+.expiry-banner { align-items: stretch; flex-direction: column; }
+.expiry-banner-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; flex-wrap: wrap; }
+.expiry-list { list-style: none; margin: .6rem 0 0; padding: 0; display: flex; flex-direction: column; gap: .3rem; }
+.expiry-list li { display: flex; gap: .6rem; flex-wrap: wrap; align-items: baseline; font-size: .95rem; color: var(--text); }
+.expiry-list a { font-weight: 700; }
 
 .card-grid {
   display: grid;

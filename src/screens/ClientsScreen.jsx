@@ -6,13 +6,16 @@ import { CONFIG } from '../config.js';
 import { STORES, get, getAll, getAllByIndex, put, remove, nextCardId } from '../db.js';
 import { evaluateAccess, formatDate, toISODate } from '../access.js';
 import { listOpenVisits } from '../visits.js';
-import { sellSubscription, freezeSubscription, unfreezeSubscription, editSubscription, FREEZE_REASONS } from '../subscriptions.js';
+import {
+  sellSubscription, freezeSubscription, unfreezeSubscription, editSubscription, FREEZE_REASONS,
+  getTrainerPrice, sellTrainerPackage, markTrainerSessionUsed, editTrainerPackage, getTrainers
+} from '../subscriptions.js';
 import { barcodeSVG } from '../barcode.js';
 import { qrSVG } from '../qr.js';
 import { fmtMoney, fmtDateTime, downloadCSV, paymentMethodLabel } from '../utils.js';
 import ArmedButton from '../components/ArmedButton.jsx';
 
-const TYPE_LABELS = { member: 'Клієнт', guest: 'Гість орендаря', trainer: 'Тренер' };
+const TYPE_LABELS = { member: 'Клієнт', guest: 'Гість' };
 
 const FILTERS = {
   all: 'Усі',
@@ -20,7 +23,7 @@ const FILTERS = {
   expiring: 'Спливають',
   expired: 'Прострочені',
   veterans: 'Ветерани',
-  guests: 'Гості орендаря',
+  guests: 'Гості',
   ingym: 'Зараз у залі',
   archived: 'Архів'
 };
@@ -157,6 +160,163 @@ function Flash({ flash }) {
   return <div className={'banner ' + (flash.isError ? 'warn-banner' : 'ok-banner')}>{flash.message}</div>;
 }
 
+// Пакет персональних тренувань — окрема послуга поза клубним абонементом
+// (client.subscription): продаж не заміняє й не продовжує абонемент, кількість
+// занять вказується щоразу при продажу, ціна за заняття тягнеться з Налаштувань
+// (subscriptions.js: getTrainerPrice), але може бути змінена тут перед продажем.
+function TrainerBox({ client, reload, flashMsg }) {
+  const pkg = client.trainerPackage;
+  const [price, setPrice] = useState(null);
+  const [trainers, setTrainers] = useState([]);
+  const [sessions, setSessions] = useState('1');
+  const [trainerId, setTrainerId] = useState('');
+  const [method, setMethod] = useState('cash');
+  const [splitPay, setSplitPay] = useState(false);
+  const [cashAmount, setCashAmount] = useState('');
+  const [cardAmount, setCardAmount] = useState('');
+  const [editing, setEditing] = useState(false);
+  const [etTotal, setEtTotal] = useState('');
+  const [etLeft, setEtLeft] = useState('');
+  const [etPrice, setEtPrice] = useState('');
+  const [etTrainerId, setEtTrainerId] = useState('');
+
+  useEffect(() => { getTrainerPrice().then(setPrice); }, []);
+  useEffect(() => { getTrainers().then(setTrainers); }, []);
+  useEffect(() => { if (pkg?.trainerId) setTrainerId(pkg.trainerId); }, [pkg?.trainerId]);
+
+  if (client.type !== 'member' || price === null) return null;
+
+  const active = trainers.filter((t) => !t.archivedAt);
+  const perSession = Number(price) || 0;
+  const count = Math.max(0, Math.round(Number(sessions)) || 0);
+  const total = perSession * count;
+  const splitCash = Number(cashAmount) || 0;
+  const splitCard = Number(cardAmount) || 0;
+  const splitDelta = splitCash + splitCard - total;
+
+  const startEdit = () => {
+    setEtTotal(String(pkg.sessionsTotal));
+    setEtLeft(String(pkg.sessionsLeft));
+    setEtPrice(String(pkg.pricePerSession));
+    setEtTrainerId(pkg.trainerId || '');
+    setEditing(true);
+  };
+
+  const saveEdit = async () => {
+    try {
+      await editTrainerPackage(client, {
+        sessionsTotal: Number(etTotal),
+        sessionsLeft: Number(etLeft),
+        pricePerSession: Number(etPrice),
+        trainerId: etTrainerId
+      });
+      setEditing(false);
+      reload();
+    } catch (e) { flashMsg(e.message, true); }
+  };
+
+  const sell = async () => {
+    try {
+      if (splitPay) {
+        await sellTrainerPackage(client, { sessions: count, pricePerSession: perSession, trainerId, cashAmount: splitCash, cardAmount: splitCard });
+      } else {
+        await sellTrainerPackage(client, { sessions: count, pricePerSession: perSession, trainerId, method });
+      }
+      setSplitPay(false);
+      setSessions('1');
+      reload();
+    } catch (e) { flashMsg(e.message, true); }
+  };
+
+  return (
+    <>
+      <h2 style={{ marginTop: '1.25rem' }}>Тренер (персональні заняття)</h2>
+      {pkg ? (
+        editing ? (
+          <div className="inline-form wrap">
+            <select value={etTrainerId} onChange={(e) => setEtTrainerId(e.target.value)}>
+              <option value="">— тренер —</option>
+              {trainers.map((t) => <option key={t.id} value={t.id}>{t.name}{t.archivedAt ? ' (архів)' : ''}</option>)}
+            </select>
+            <input type="number" placeholder="Всього" min={0} style={{ width: 90 }} value={etTotal} onChange={(e) => setEtTotal(e.target.value)} />
+            <input type="number" placeholder="Залишок" min={0} style={{ width: 90 }} value={etLeft} onChange={(e) => setEtLeft(e.target.value)} />
+            <input type="number" placeholder="Ціна/заняття" min={0} style={{ width: 100 }} value={etPrice} onChange={(e) => setEtPrice(e.target.value)} />
+            <button type="button" className="btn-primary" onClick={saveEdit}>Зберегти</button>
+            <button type="button" onClick={() => setEditing(false)}>Скасувати</button>
+          </div>
+        ) : (
+          <>
+            <div className={'sub-info status-' + (pkg.sessionsLeft > 0 ? 'ok' : 'deny')}>
+              <div className="sub-title">Пакет тренувань · {pkg.trainerName || '—'}</div>
+              <div>Залишилось: {pkg.sessionsLeft} з {pkg.sessionsTotal}</div>
+              <div className="muted">Ціна за заняття: {fmtMoney(pkg.pricePerSession)}</div>
+            </div>
+            <div className="inline-form">
+              <button type="button" disabled={pkg.sessionsLeft <= 0} onClick={async () => {
+                try { await markTrainerSessionUsed(client); reload(); }
+                catch (e) { flashMsg(e.message, true); }
+              }}>Відмітити тренування</button>
+              <button type="button" className="small" onClick={startEdit}>✏️ Редагувати</button>
+            </div>
+          </>
+        )
+      ) : (
+        <p className="muted">Пакету тренувань ще немає</p>
+      )}
+
+      <h3>{pkg ? 'Докупити тренування' : 'Продати тренування'}</h3>
+      {!active.length ? (
+        <p className="muted">Немає тренерів — додайте у вкладці <a href="#trainers">Тренери</a></p>
+      ) : (
+      <div className="sell-form">
+        <label>Тренер:{' '}
+          <select value={trainerId} onChange={(e) => setTrainerId(e.target.value)}>
+            <option value="">— оберіть тренера —</option>
+            {active.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        </label>
+        <label>Кількість занять:{' '}
+          <input type="number" min={1} style={{ width: 80 }} value={sessions} onChange={(e) => setSessions(e.target.value)} />
+        </label>
+        <span className="muted">× {fmtMoney(perSession)} = {fmtMoney(total)}</span>
+        {!splitPay ? (
+          <select value={method} onChange={(e) => setMethod(e.target.value)}>
+            <option value="cash">Готівка</option>
+            <option value="card">Картка</option>
+          </select>
+        ) : (
+          <>
+            <div className="cash-count-row" style={{ marginTop: 0 }}>
+              <label>Готівкою</label>
+              <input type="number" inputMode="numeric" min="0" value={cashAmount} onChange={(e) => setCashAmount(e.target.value)} />
+            </div>
+            <div className="cash-count-row" style={{ marginTop: 0 }}>
+              <label>Карткою</label>
+              <input type="number" inputMode="numeric" min="0" value={cardAmount} onChange={(e) => setCardAmount(e.target.value)} />
+            </div>
+            <p className={'cash-delta ' + (splitDelta === 0 ? 'ok' : 'bad')}>
+              {splitDelta === 0 ? '✓ Сходиться з сумою' : `Δ ${splitDelta > 0 ? '+' : ''}${fmtMoney(splitDelta)} до суми`}
+            </p>
+          </>
+        )}
+        <button type="button" className="small" onClick={() => {
+          setSplitPay(!splitPay);
+          if (!splitPay) { setCashAmount(String(total)); setCardAmount('0'); }
+        }}>
+          {splitPay ? '← Один спосіб оплати' : 'Розділити оплату (готівка + картка)'}
+        </button>
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={count < 1 || !trainerId || (splitPay && splitDelta !== 0)}
+          onClick={sell}
+        >Продати</button>
+      </div>
+      )}
+    </>
+  );
+}
+
 function ClientCard({ id }) {
   const [client, setClient] = useState(undefined); // undefined = завантаження
   const [editing, setEditing] = useState(false);
@@ -278,9 +438,7 @@ function ClientCard({ id }) {
           <Flash flash={flash} />
           {client.type !== 'member' ? (
             <p className="muted">
-              {client.type === 'guest'
-                ? 'Гість орендаря: платить напряму тренеру, абонемент не потрібен, гроші не проходять через клуб.'
-                : 'Тренер-орендар: доступ без абонемента.'}
+              Гість: прийшов від власника залу — без абонемента і без оплати входу.
             </p>
           ) : s ? (
             <>
@@ -404,6 +562,8 @@ function ClientCard({ id }) {
               })()}
             </>
           )}
+
+          {client.type === 'member' && <TrainerBox client={client} reload={load} flashMsg={flashMsg} />}
         </div>
 
         <div className="box">
@@ -463,7 +623,7 @@ function ClientForm({ client, presetId = '', onDone, onBack }) {
   const isNew = !client;
   const c = client || {
     id: presetId, type: 'member', name: '', phone: '', birthday: '', isVeteran: false,
-    medicalNotes: '', consentAt: '', hostTrainerId: '', createdAt: '', archivedAt: null, subscription: null
+    medicalNotes: '', consentAt: '', createdAt: '', archivedAt: null, subscription: null
   };
   const [id, setId] = useState(c.id);
   const [type, setType] = useState(c.type);
@@ -473,16 +633,7 @@ function ClientForm({ client, presetId = '', onDone, onBack }) {
   const [isVeteran, setIsVeteran] = useState(c.isVeteran);
   const [medicalNotes, setMedicalNotes] = useState(c.medicalNotes);
   const [consent, setConsent] = useState(!!c.consentAt);
-  const [hostTrainerId, setHostTrainerId] = useState(c.hostTrainerId);
-  const [trainers, setTrainers] = useState([]);
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    (async () => {
-      const all = await getAll(STORES.clients);
-      setTrainers(all.filter((x) => x.type === 'trainer' && !x.archivedAt));
-    })();
-  }, []);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -506,7 +657,6 @@ function ClientForm({ client, presetId = '', onDone, onBack }) {
       isVeteran,
       medicalNotes: medicalNotes.trim(),
       consentAt: consent ? (c.consentAt || new Date().toISOString()) : '',
-      hostTrainerId: type === 'guest' ? hostTrainerId : '',
       createdAt: c.createdAt || new Date().toISOString()
     };
     await put(STORES.clients, updated);
@@ -548,14 +698,6 @@ function ClientForm({ client, presetId = '', onDone, onBack }) {
         <label className="form-row">⚕ Медичні нотатки
           <textarea rows={3} placeholder="Травми, обмеження — напр., «грижа L4–L5, без осьового навантаження»" value={medicalNotes} onChange={(e) => setMedicalNotes(e.target.value)} />
         </label>
-        {type === 'guest' && (
-          <label className="form-row">До кого прийшов
-            <select value={hostTrainerId} onChange={(e) => setHostTrainerId(e.target.value)}>
-              <option value="">— оберіть тренера —</option>
-              {trainers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
-          </label>
-        )}
         <label className="form-row check">
           <input type="checkbox" checked={consent} onChange={(e) => setConsent(e.target.checked)} /> Згоду на обробку персональних даних підписано
         </label>

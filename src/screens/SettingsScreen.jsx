@@ -16,6 +16,7 @@ import {
   openShift, getRecentClosedShifts
 } from '../shifts.js';
 import { getCloudReportConfig, setCloudReportConfig, trySendReport } from '../cloud.js';
+import { getTrainerPrice, setTrainerPrice } from '../subscriptions.js';
 
 function TariffsBox() {
   const [tariffs, setTariffs] = useState([]);
@@ -118,6 +119,41 @@ function TariffsBox() {
         </label>
         <button type="submit" className="btn-primary">Додати</button>
       </form>
+    </div>
+  );
+}
+
+// Ціна за одне персональне тренування з тренером — окрема послуга (subscriptions.js:
+// sellTrainerPackage), не пов'язана з клубним абонементом. Кількість занять щоразу
+// вказується при продажу в картці клієнта, тут задається лише ціна за одне заняття.
+function TrainerPriceBox() {
+  const [price, setPrice] = useState('');
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => { getTrainerPrice().then((p) => setPrice(String(p))); }, []);
+
+  const save = async (e) => {
+    e.preventDefault();
+    await setTrainerPrice(price);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  };
+
+  return (
+    <div className="box">
+      <h2>Тренер (персональні заняття)</h2>
+      <p className="muted">
+        Ціна за одне заняття з тренером — продається окремо від клубного абонемента
+        (не замінює й не продовжує його). Кількість занять вказується щоразу при
+        продажу в картці клієнта.
+      </p>
+      <form className="inline-form" onSubmit={save}>
+        <label>Ціна за заняття, грн:{' '}
+          <input type="number" min={0} style={{ width: 100 }} value={price} onChange={(e) => setPrice(e.target.value)} />
+        </label>
+        <button type="submit" className="btn-primary">Зберегти</button>
+      </form>
+      {saved && <p className="status-ok">Збережено</p>}
     </div>
   );
 }
@@ -392,6 +428,7 @@ export default function SettingsScreen() {
   return (
     <>
       <TariffsBox />
+      <TrainerPriceBox />
       <ShiftBox />
       <CloudReportBox />
       <BackupBox />
